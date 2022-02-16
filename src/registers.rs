@@ -13,7 +13,7 @@ pub struct Registers {
 
 impl Registers {
     pub fn new() -> Registers {
-        Registers {
+        let mut registers = Registers {
             a: 0,
             b: 0,
             c: 0,
@@ -23,8 +23,13 @@ impl Registers {
             h: 0,
             l: 0,
             pc: 0x100,
-            sp: 0,
-        }
+            sp: 0xfffe,
+        };
+        registers.set_af(0x01b0);
+        registers.set_bc(0x13);
+        registers.set_de(0xd8);
+        registers.set_hl(0x14d);
+        registers
     }
 
     pub fn af(&self) -> u16 {
