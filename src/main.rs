@@ -1,5 +1,16 @@
 use std::env;
 
+fn to_u8(value: u16) -> (u8, u8) {
+    // Converts u16 into (msb: u8, lsb: u8)
+    let lsb = value & 0xff;
+    let msb = (value & 0xff00) >> 8;
+    (msb as u8, lsb as u8)
+}
+
+fn to_u16(msb: u8, lsb: u8) -> u16 {
+    ((msb as u16) << 8) | lsb as u16
+}
+
 mod cpu {
     #[derive(Debug)]
     struct Registers {
@@ -310,18 +321,30 @@ mod cpu {
                 0xbe => { let val = mmu.readb(self.reg.hl()); self.cp(val); 8 }, // CP A, (HL)
                 0xbf => { self.cp(self.reg.a); 4 }, // CP A, A
 
+                0xc1 => { let bc = self.pop(mmu); self.reg.set_bc(bc); 12 }, // POP BC
                 0xc2 => { if self.reg.get_z() { 12 } else { self.reg.pc = self.readw(mmu); 16 } }, // JP NZ, u16
                 0xc3 => { self.reg.pc = self.readw(mmu); 16 }, // JP u16
+                0xc5 => { self.push(mmu, self.reg.bc()); 16 }, // PUSH BC
                 0xc6 | 0xce => { let val = self.readb(mmu); self.add(val, opcode == 0xce); 8 }, // ADD A, u8 or ADC A, u8
+                0xc9 => { self.reg.pc = self.pop(mmu); 16 }, // RET
                 0xca => { if self.reg.get_z() { self.reg.pc = self.readw(mmu); 16 } else { 12 } }, // JP Z, u16
+                0xcd => { let addr = self.readw(mmu); self.call(mmu, addr); 24 }, // CALL u16
+
+                0xd1 => { let de = self.pop(mmu); self.reg.set_de(de); 12 }, // POP DE
+
                 0xd2 => { if self.reg.get_c() { 12 } else { self.reg.pc = self.readw(mmu); 16 } }, // JP NC, u16
+                0xd5 => { self.push(mmu, self.reg.de()); 16 }, // PUSH DE
                 0xd6 | 0xde => { let val = self.readb(mmu); self.sub(val, opcode == 0xde); 8 }, // SUB A, u8 or SBC A, u8
                 0xda => { if self.reg.get_c() { self.reg.pc = self.readw(mmu); 16 } else { 12 } }, // JP C, u16
 
+                0xe1 => { let hl = self.pop(mmu); self.reg.set_hl(hl); 12 }, // POP HL
+                0xe5 => { self.push(mmu, self.reg.hl()); 16 }, // PUSH HL
                 0xe6 => { let val = self.readb(mmu); self.and(val); 8 }, // AND A, u8
                 0xee => { let val = self.readb(mmu); self.xor(val); 8 }, // XOR A, u8
 
+                0xf1 => { let af = self.pop(mmu); self.reg.set_af(af); 12 }, // POP AF
                 0xf3 => { self.ime = false; 4 }, // DI
+                0xf5 => { self.push(mmu, self.reg.af()); 16 }, // PUSH AF
                 0xf6 => { let val = self.readb(mmu); self.or(val); 8 }, // OR A, u8
                 0xfb => { self.ime = true; 4 } // EI
                 0xfe => { let val = self.readb(mmu); self.cp(val); 8 }, // CP A, u8
@@ -463,6 +486,34 @@ mod cpu {
             self.reg.set_hl(hl.wrapping_sub(1));
         }
 
+        fn push(&mut self, mmu: &mut super::mmu::MMU, value: u16) {
+            let (msb, lsb) = super::to_u8(value);
+
+            // TODO: can we simplify with writew ?
+            self.reg.sp = self.reg.sp.wrapping_sub(1);
+            mmu.writeb(self.reg.sp, msb as u8);
+            self.reg.sp = self.reg.sp.wrapping_sub(1);
+            mmu.writeb(self.reg.sp, lsb as u8);
+        }
+
+        fn pop(&mut self, mmu: &super::mmu::MMU) -> u16 {
+            // Returns poped 16bits value as (msb, lsb)
+            let lsb = mmu.readb(self.reg.sp);
+            self.reg.sp = self.reg.sp.wrapping_add(1);
+            let msb = mmu.readb(self.reg.sp);
+            self.reg.sp = self.reg.sp.wrapping_add(1);
+
+            super::to_u16(msb, lsb)
+        }
+
+        fn call(&mut self, mmu: &mut super::mmu::MMU, addr: u16) {
+            // CALL on addr
+            // PUSH PC and JP
+
+            self.push(mmu, self.reg.pc);
+            self.reg.pc = addr;
+        }
+
         fn readb(&mut self, mmu: &super::mmu::MMU) -> u8 {
             let byte = mmu.readb(self.reg.pc);
             self.reg.pc = self.reg.pc.wrapping_add(1);
@@ -509,7 +560,7 @@ mod mmu {
                 self.memory[(addr + 1) as usize]
             };
 
-            ((msb as u16) << 8) | lsb as u16
+            super::to_u16(msb, lsb)
         }
 
         pub fn writeb(&mut self, addr: u16, value: u8) {
@@ -523,8 +574,7 @@ mod mmu {
         }
 
         pub fn writew(&mut self, addr: u16, value: u16) {
-            let lsb = value & 0xff;
-            let msb = (value & 0xff00) >> 8;
+            let (msb, lsb) = super::to_u8(value);
 
             if addr < 0x8000 {
                 self.rom[addr as usize] = lsb as u8;
