@@ -1,7 +1,9 @@
 pub struct MMU {
     rom: Vec<u8>,
-    memory: [u8; 0x10000]
+    pub memory: [u8; 0x10000]
 }
+
+use super::lcd;
 
 impl MMU {
     pub fn new(rom: Vec<u8>) -> MMU {
@@ -35,9 +37,10 @@ impl MMU {
     pub fn writeb(&mut self, addr: u16, value: u8) {
         if addr < 0x8000 {
             self.rom[addr as usize] = value;
-        }
-        else
-        {
+        } else if addr == lcd::SCANLINE_REGISTER as u16 {
+            // Reset the current scanline index if the game tries to write to it
+            self.memory[addr as usize] = 0 ;
+        } else {
             self.memory[addr as usize] = value;
         }
     }
