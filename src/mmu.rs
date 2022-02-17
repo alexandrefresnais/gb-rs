@@ -1,13 +1,18 @@
-pub struct MMU {
-    rom: Vec<u8>,
-    pub memory: [u8; 0x10000]
+pub struct MMU<'a> {
+    cartridge: &'a mut Cartridge,
+    pub memory: [u8; 0x10000],
 }
 
 use super::lcd;
+use super::Cartridge;
 
-impl MMU {
-    pub fn new(rom: Vec<u8>) -> MMU {
-        let mut mmu = MMU { rom: rom, memory:  [0; 0x10000]};
+impl<'a> MMU<'a> {
+    pub fn new(cartridge: &'a mut Cartridge) -> MMU<'a> {
+        let mut mmu = MMU {
+            cartridge,
+            memory: [0; 0x10000],
+        };
+
         mmu.memory[0xFF05] = 0x00;
         mmu.memory[0xFF06] = 0x00;
         mmu.memory[0xFF07] = 0x00;
@@ -44,8 +49,8 @@ impl MMU {
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
-        if addr < 0x8000 {
-            *self.rom.get(addr as usize).unwrap()
+        if addr < 0x8000 || (0xA000..=0xBFFF).contains(&addr) {
+            self.cartridge.readb(addr)
         } else {
             self.memory[addr as usize]
         }
@@ -59,20 +64,16 @@ impl MMU {
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
-        if addr < 0x8000 {
-            // Restricted
-        } else if (0xE000..0xFE00).contains(&addr) {
-            self.memory[addr as usize] = value;
-            self.writeb(addr - 0x2000, value);
-        }
-        else if addr == lcd::SCANLINE_REGISTER as u16 {
-            // Reset the current scanline index if the game tries to write to it
-            self.memory[addr as usize] = 0 ;
-        } else if (0xFEA0..0xFEFF).contains(&addr) {
-            // Restricted
-        } else {
-            self.memory[addr as usize] = value;
-        }
+        match addr as usize {
+            0..=0x7fff | 0xa000..=0xbfff => self.cartridge.writeb(addr, value),
+            0xe000..=0xfdff => {
+                self.memory[addr as usize] = value;
+                self.writeb(addr - 0x2000, value)
+            } // ECHO RAM
+            0xfea0..=0xfeff => (), // Restricted
+            lcd::SCANLINE_REGISTER => self.memory[lcd::SCANLINE_REGISTER] = 0, // Reset if write
+            n => self.memory[n] = value,
+        };
     }
 
     pub fn writew(&mut self, addr: u16, value: u16) {

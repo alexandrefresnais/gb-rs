@@ -12,7 +12,7 @@ pub struct Registers {
 }
 
 impl Registers {
-    pub fn new() -> Registers {
+    pub fn new() -> Self {
         let mut registers = Registers {
             a: 0,
             b: 0,

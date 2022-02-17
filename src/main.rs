@@ -11,14 +11,22 @@ fn to_u16(msb: u8, lsb: u8) -> u16 {
     ((msb as u16) << 8) | lsb as u16
 }
 
+fn test_bit(data: u16, index: u16) -> bool {
+    // Returns true if nth bit of data is set
+    let bit_set = 1 << index;
+    data & bit_set == bit_set
+}
+
 mod cpu;
 mod mmu;
 mod registers;
 mod lcd;
+mod cartridge;
 
 use cpu::CPU;
 use mmu::MMU;
 use lcd::LCD;
+use cartridge::Cartridge;
 
 fn run_one_frame(cpu: &mut CPU, mmu: &mut MMU) {
     // GameBoy can execute 4194304 cycles per second
@@ -39,9 +47,10 @@ fn run_one_frame(cpu: &mut CPU, mmu: &mut MMU) {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let rom = std::fs::read(&args[1]);
-    let mut mmu = mmu::MMU::new(rom.unwrap());
-    let mut cpu = cpu::CPU::new();
-    let mut lcd = lcd::LCD::new();
+    let mut cartridge = Cartridge::new(&args[1]);
+    let mut mmu = MMU::new(&mut cartridge);
+    let mut cpu = CPU::new();
+    let mut lcd = LCD::new();
 
     loop {
         run_one_frame(&mut cpu, &mut mmu);
