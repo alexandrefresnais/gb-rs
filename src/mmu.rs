@@ -52,27 +52,24 @@ impl MMU {
     }
 
     pub fn readw(&self, addr: u16) -> u16 {
-        let lsb = if addr < 0x8000 {
-            *self.rom.get(addr as usize).unwrap()
-        } else {
-            self.memory[addr as usize]
-        };
-
-        let msb = if addr < 0x8000 {
-            *self.rom.get((addr + 1) as usize).unwrap()
-        } else {
-            self.memory[(addr + 1) as usize]
-        };
+        let lsb = self.readb(addr);
+        let msb = self.readb(addr + 1);
 
         super::to_u16(msb, lsb)
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
         if addr < 0x8000 {
-            self.rom[addr as usize] = value;
-        } else if addr == lcd::SCANLINE_REGISTER as u16 {
+            // Restricted
+        } else if (0xE000..0xFE00).contains(&addr) {
+            self.memory[addr as usize] = value;
+            self.writeb(addr - 0x2000, value);
+        }
+        else if addr == lcd::SCANLINE_REGISTER as u16 {
             // Reset the current scanline index if the game tries to write to it
             self.memory[addr as usize] = 0 ;
+        } else if (0xFEA0..0xFEFF).contains(&addr) {
+            // Restricted
         } else {
             self.memory[addr as usize] = value;
         }
@@ -81,13 +78,7 @@ impl MMU {
     pub fn writew(&mut self, addr: u16, value: u16) {
         let (msb, lsb) = super::to_u8(value);
 
-        if addr < 0x8000 {
-            self.rom[addr as usize] = lsb as u8;
-            self.rom[(addr + 1) as usize] = msb as u8;
-        }
-        else {
-            self.memory[addr as usize] = lsb as u8;
-            self.memory[(addr + 1) as usize] = msb as u8;
-        }
+        self.writeb(addr, lsb);
+        self.writeb(addr + 1, msb);
     }
 }
