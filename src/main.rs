@@ -23,12 +23,12 @@ mod registers;
 mod lcd;
 mod cartridge;
 
-use cpu::CPU;
-use mmu::MMU;
-use lcd::LCD;
+use cpu::Cpu;
+use mmu::Mmu;
+use lcd::Lcd;
 use cartridge::Cartridge;
 
-fn run_one_frame(cpu: &mut CPU, mmu: &mut MMU) {
+fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
     // GameBoy can execute 4194304 cycles per second
     // We want 60 frames per second
     // So we run 69905 each frame
@@ -46,11 +46,10 @@ fn run_one_frame(cpu: &mut CPU, mmu: &mut MMU) {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let rom = std::fs::read(&args[1]);
     let mut cartridge = Cartridge::new(&args[1]);
-    let mut mmu = MMU::new(&mut cartridge);
-    let mut cpu = CPU::new();
-    let mut lcd = LCD::new();
+    let mut mmu = Mmu::new(&mut cartridge);
+    let mut cpu = Cpu::new();
+    let mut lcd = Lcd::new();
 
     loop {
         run_one_frame(&mut cpu, &mut mmu);

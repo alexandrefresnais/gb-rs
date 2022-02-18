@@ -70,33 +70,33 @@ impl Registers {
 
     pub fn set_z(&mut self, value: bool) {
         if value {
-            self.f = self.f | 0b1000000;
+            self.f |= 0b1000000;
         } else {
-            self.f = self.f & 0b0111111;
+            self.f &= 0b0111111;
         }
     }
 
     pub fn set_n(&mut self, value: bool) {
         if value {
-            self.f = self.f | 0b100000;
+            self.f |= 0b100000;
         } else {
-            self.f = self.f & 0b011111;
+            self.f &= 0b011111;
         }
     }
 
     pub fn set_h(&mut self, value: bool) {
         if value {
-            self.f = self.f | 0b10000;
+            self.f |= 0b10000;
         } else {
-            self.f = self.f & 0b01111;
+            self.f |= 0b01111;
         }
     }
 
     pub fn set_c(&mut self, value: bool) {
         if value {
-            self.f = self.f | 0b1000;
+            self.f |= 0b1000;
         } else {
-            self.f = self.f & 0b0111;
+            self.f &= 0b0111;
         }
     }
 

@@ -1,14 +1,16 @@
-pub struct MMU<'a> {
+use crate::lcd;
+use crate::cartridge::Cartridge;
+use crate::to_u16;
+use crate::to_u8;
+
+pub struct Mmu<'a> {
     cartridge: &'a mut Cartridge,
     pub memory: [u8; 0x10000],
 }
 
-use super::lcd;
-use super::Cartridge;
-
-impl<'a> MMU<'a> {
-    pub fn new(cartridge: &'a mut Cartridge) -> MMU<'a> {
-        let mut mmu = MMU {
+impl<'a> Mmu<'a> {
+    pub fn new(cartridge: &'a mut Cartridge) -> Mmu<'a> {
+        let mut mmu = Mmu {
             cartridge,
             memory: [0; 0x10000],
         };
@@ -60,7 +62,7 @@ impl<'a> MMU<'a> {
         let lsb = self.readb(addr);
         let msb = self.readb(addr + 1);
 
-        super::to_u16(msb, lsb)
+        to_u16(msb, lsb)
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
@@ -77,7 +79,7 @@ impl<'a> MMU<'a> {
     }
 
     pub fn writew(&mut self, addr: u16, value: u16) {
-        let (msb, lsb) = super::to_u8(value);
+        let (msb, lsb) = to_u8(value);
 
         self.writeb(addr, lsb);
         self.writeb(addr + 1, msb);

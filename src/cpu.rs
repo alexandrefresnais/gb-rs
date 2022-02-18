@@ -1,20 +1,23 @@
 use crate::registers::Registers;
+use crate::mmu::Mmu;
+use crate::to_u8;
+use crate::to_u16;
 
-pub struct CPU {
+pub struct Cpu {
     reg: Registers,
     ime: bool
 }
 
-impl CPU {
-    pub fn new() -> CPU {
-        CPU {
+impl Cpu {
+    pub fn new() -> Self {
+        Cpu {
             reg: Registers::new(),
             ime: false,
         }
     }
 
-    pub fn run_cycle(&mut self, mmu: &mut super::mmu::MMU) -> u8 {
-        // In this implementation, the CPU will give the number of cycle
+    pub fn run_cycle(&mut self, mmu: &mut Mmu) -> u8 {
+        // In this implementation, the Cpu will give the number of cycle
         // to run on other components
         let opcode = self.readb(mmu);
 
@@ -255,7 +258,7 @@ impl CPU {
     }
 
     fn xor(&mut self, value: u8) {
-        self.reg.a = self.reg.a ^ value;
+        self.reg.a ^= value;
 
         self.reg.set_h(false);
         self.reg.set_c(false);
@@ -264,7 +267,7 @@ impl CPU {
     }
 
     fn and(&mut self, value: u8) {
-        self.reg.a = self.reg.a & value;
+        self.reg.a &= value;
 
         self.reg.set_h(true);
         self.reg.set_z(self.reg.a == 0);
@@ -273,7 +276,7 @@ impl CPU {
     }
 
     fn or(&mut self, value: u8) {
-        self.reg.a = self.reg.a | value;
+        self.reg.a |= value;
 
         self.reg.set_h(false);
         self.reg.set_z(self.reg.a == 0);
@@ -301,7 +304,7 @@ impl CPU {
         self.reg.set_c(true);
     }
 
-    fn jr(&mut self, mmu: &mut super::mmu::MMU) {
+    fn jr(&mut self, mmu: &mut Mmu) {
         // Add i8 to PC
         let delta = self.readb(mmu) as i8;
         self.reg.pc = self.reg.pc.wrapping_add(delta as u16);
@@ -327,7 +330,7 @@ impl CPU {
         res
     }
 
-    fn inc_at(&mut self, mmu: &mut super::mmu::MMU, address: u16) {
+    fn inc_at(&mut self, mmu: &mut Mmu, address: u16) {
         // INC (address)
         // Sets Z, N, and H
         let value = mmu.readb(address);
@@ -338,7 +341,7 @@ impl CPU {
         mmu.writeb(address, res);
     }
 
-    fn dec_at(&mut self, mmu: &mut super::mmu::MMU, address: u16) {
+    fn dec_at(&mut self, mmu: &mut Mmu, address: u16) {
         // DEC (address)
         // Sets Z, N, and H
         let value = mmu.readb(address);
@@ -359,8 +362,8 @@ impl CPU {
         self.reg.set_hl(hl.wrapping_sub(1));
     }
 
-    fn push(&mut self, mmu: &mut super::mmu::MMU, value: u16) {
-        let (msb, lsb) = super::to_u8(value);
+    fn push(&mut self, mmu: &mut Mmu, value: u16) {
+        let (msb, lsb) = to_u8(value);
 
         // TODO: can we simplify with writew ?
         self.reg.sp = self.reg.sp.wrapping_sub(1);
@@ -369,17 +372,17 @@ impl CPU {
         mmu.writeb(self.reg.sp, lsb as u8);
     }
 
-    fn pop(&mut self, mmu: &super::mmu::MMU) -> u16 {
+    fn pop(&mut self, mmu: &Mmu) -> u16 {
         // Returns poped 16bits value as (msb, lsb)
         let lsb = mmu.readb(self.reg.sp);
         self.reg.sp = self.reg.sp.wrapping_add(1);
         let msb = mmu.readb(self.reg.sp);
         self.reg.sp = self.reg.sp.wrapping_add(1);
 
-        super::to_u16(msb, lsb)
+        to_u16(msb, lsb)
     }
 
-    fn call(&mut self, mmu: &mut super::mmu::MMU, addr: u16) {
+    fn call(&mut self, mmu: &mut Mmu, addr: u16) {
         // CALL on addr
         // PUSH PC and JP
 
@@ -387,13 +390,13 @@ impl CPU {
         self.reg.pc = addr;
     }
 
-    fn readb(&mut self, mmu: &super::mmu::MMU) -> u8 {
+    fn readb(&mut self, mmu: &Mmu) -> u8 {
         let byte = mmu.readb(self.reg.pc);
         self.reg.pc = self.reg.pc.wrapping_add(1);
         byte
     }
 
-    fn readw(&mut self, mmu: &super::mmu::MMU) -> u16 {
+    fn readw(&mut self, mmu: &Mmu) -> u16 {
         let word = mmu.readw(self.reg.pc);
         self.reg.pc = self.reg.pc.wrapping_add(2);
         word

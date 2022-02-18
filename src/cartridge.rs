@@ -4,7 +4,7 @@ const RAM_BANK_SIZE: u16 = 0x2000;
 const NB_RAM_BANK: u16 = 4;
 const RAM_SIZE: usize = (NB_RAM_BANK * RAM_BANK_SIZE) as usize;
 
-use super::test_bit;
+use crate::test_bit;
 
 // A000-BFFF RAM bank from cartridge if any (switchable)
 
@@ -78,7 +78,7 @@ impl Cartridge {
 
     fn handle_banking(&mut self, addr: u16, value: u8) {
         // No MBC means no banking
-        if let None = self.mbc {
+        if self.mbc.is_none() {
             return;
         }
 
