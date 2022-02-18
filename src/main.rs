@@ -22,11 +22,13 @@ mod mmu;
 mod registers;
 mod lcd;
 mod cartridge;
+mod timer;
 
 use cpu::Cpu;
 use mmu::Mmu;
 use lcd::Lcd;
 use cartridge::Cartridge;
+use timer::Timer;
 
 fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
     // GameBoy can execute 4194304 cycles per second
@@ -37,6 +39,8 @@ fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
     let mut cycles: u64 = 0;
     while cycles < FRAME_CYLES {
         let cpu_cycles = cpu.run_cycle(mmu);
+
+        // TODO update timer
 
         cycles += cpu_cycles as u64;
     }

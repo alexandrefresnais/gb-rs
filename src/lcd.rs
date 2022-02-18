@@ -1,5 +1,5 @@
 // Memory address storing the current scanline
-pub const SCANLINE_REGISTER: usize = 0xFF44;
+pub const SCANLINE_REGISTER: u16 = 0xFF44;
 const LCD_STATUS_REGISTER: usize = 0xFF41;
 const LCD_CONTROL_REGISTER: u16 = 0xFF40;
 
@@ -38,12 +38,12 @@ impl Lcd {
             // We have to move on to next scanline
             let mut current_line = mmu.readb(SCANLINE_REGISTER as u16);
             current_line = current_line.wrapping_add(1);
-            mmu.memory[SCANLINE_REGISTER] =  current_line;
+            mmu.memory[SCANLINE_REGISTER as usize] =  current_line;
 
             self.scanlines_cycles = 456;
 
             if current_line > 153 {
-                mmu.memory[SCANLINE_REGISTER] = 0;
+                mmu.memory[SCANLINE_REGISTER as usize] = 0;
             }
         }
     }

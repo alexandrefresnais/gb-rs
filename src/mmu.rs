@@ -1,11 +1,17 @@
 use crate::lcd;
 use crate::cartridge::Cartridge;
+use crate::timer::Timer;
+use crate::timer::DIVIDER_REGISTER;
+use crate::timer::TIMA;
+use crate::timer::TMA;
+use crate::timer::TMC;
 use crate::to_u16;
 use crate::to_u8;
 
 pub struct Mmu<'a> {
     cartridge: &'a mut Cartridge,
     pub memory: [u8; 0x10000],
+    timer: Timer,
 }
 
 impl<'a> Mmu<'a> {
@@ -13,6 +19,7 @@ impl<'a> Mmu<'a> {
         let mut mmu = Mmu {
             cartridge,
             memory: [0; 0x10000],
+            timer: Timer::new(),
         };
 
         mmu.memory[0xFF05] = 0x00;
@@ -51,10 +58,10 @@ impl<'a> Mmu<'a> {
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
-        if addr < 0x8000 || (0xA000..=0xBFFF).contains(&addr) {
-            self.cartridge.readb(addr)
-        } else {
-            self.memory[addr as usize]
+        match addr {
+            0..=0x7fff | 0xA000..=0xBFFF => self.cartridge.readb(addr),
+            DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.readb(addr),
+            _ =>  self.memory[addr as usize]
         }
     }
 
@@ -66,15 +73,16 @@ impl<'a> Mmu<'a> {
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
-        match addr as usize {
+        match addr {
             0..=0x7fff | 0xa000..=0xbfff => self.cartridge.writeb(addr, value),
             0xe000..=0xfdff => {
                 self.memory[addr as usize] = value;
                 self.writeb(addr - 0x2000, value)
-            } // ECHO RAM
+            }, // ECHO RAM
+            DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.writeb(addr, value),
             0xfea0..=0xfeff => (), // Restricted
-            lcd::SCANLINE_REGISTER => self.memory[lcd::SCANLINE_REGISTER] = 0, // Reset if write
-            n => self.memory[n] = value,
+            lcd::SCANLINE_REGISTER => self.memory[lcd::SCANLINE_REGISTER as usize] = 0, // Reset if write
+            n => self.memory[n as usize] = value,
         };
     }
 
