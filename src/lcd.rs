@@ -1,3 +1,7 @@
+use crate::mmu::Mmu;
+use crate::test_bit;
+use crate::cpu::V_BLANK_INTERUPT;
+
 // Memory address storing the current scanline
 pub const SCANLINE_REGISTER: u16 = 0xFF44;
 const LCD_STATUS_REGISTER: usize = 0xFF41;
@@ -5,9 +9,6 @@ const LCD_CONTROL_REGISTER: u16 = 0xFF40;
 
 // Number of cpu clock cycles it takes to draw on scanline
 const SCANLINE_CYCLES: i64 = 456;
-
-use crate::mmu::Mmu;
-use crate::test_bit;
 
 pub struct Lcd {
     scanlines_cycles: i64
@@ -41,6 +42,10 @@ impl Lcd {
             mmu.memory[SCANLINE_REGISTER as usize] =  current_line;
 
             self.scanlines_cycles = 456;
+
+            if current_line == 144 {
+                mmu.request_interupt(V_BLANK_INTERUPT);
+            }
 
             if current_line > 153 {
                 mmu.memory[SCANLINE_REGISTER as usize] = 0;

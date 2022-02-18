@@ -2,6 +2,20 @@ use crate::registers::Registers;
 use crate::mmu::Mmu;
 use crate::to_u8;
 use crate::to_u16;
+use crate::test_bit;
+
+// Address of interupts routines
+const V_BLANK_ROUTINE: u16 = 0x40;
+const LCD_ROUTINE: u16 = 0x48;
+const TIMER_ROUTINE: u16 = 0x50;
+const JOYPAD_ROUTINE: u16 = 0x60;
+
+// Interupt bit
+pub const V_BLANK_INTERUPT: u8 = 0;
+pub const LCD_INTERUPT: u8 = 1;
+pub const TIMER_INTERUPT: u8 = 2;
+pub const JOYPAD_INTERUPT: u8 = 4;
+
 
 pub struct Cpu {
     reg: Registers,
@@ -12,7 +26,7 @@ impl Cpu {
     pub fn new() -> Self {
         Cpu {
             reg: Registers::new(),
-            ime: false,
+            ime: true,
         }
     }
 
@@ -406,5 +420,33 @@ impl Cpu {
         let word = mmu.readw(self.reg.pc);
         self.reg.pc = self.reg.pc.wrapping_add(2);
         word
+    }
+
+    pub fn check_interupts(&mut self, mmu: &mut Mmu) {
+        if !self.ime {
+            return
+        }
+
+        let requested = mmu.int_request as u16;
+        let enabled = mmu.int_enabled as u16;
+        for interupt in 0..=4 {
+            if test_bit(requested, interupt as u16) && test_bit(enabled, interupt as u16) {
+                self.execute_interupt(interupt, mmu);
+            }
+        }
+    }
+
+    fn execute_interupt(&mut self, interupt: u8, mmu: &mut Mmu) {
+        self.ime = false;
+        // Unset request
+        mmu.int_request ^= 1 << interupt;
+
+        match interupt {
+            V_BLANK_INTERUPT => self.call(mmu, V_BLANK_ROUTINE),
+            LCD_INTERUPT => self.call(mmu, LCD_ROUTINE),
+            TIMER_INTERUPT => self.call(mmu, TIMER_ROUTINE),
+            JOYPAD_INTERUPT => self.call(mmu, JOYPAD_ROUTINE),
+            _ => panic!("Should not happen")
+        }
     }
 }

@@ -1,5 +1,6 @@
 use crate::mmu::Mmu;
 use crate::test_bit;
+use crate::cpu::TIMER_INTERUPT;
 
 pub const DIVIDER_REGISTER: u16 = 0xFF04;
 pub const TIMA: u16 = 0xFF05; // Timer
@@ -61,7 +62,7 @@ impl Timer {
                 // About to overflow, set it to TMA
                 self.timer = self.timer_modulo as u32;
 
-                // TODO request interrupt
+                mmu.request_interupt(TIMER_INTERUPT as u8);
             }
             else {
                 self.timer += 1;

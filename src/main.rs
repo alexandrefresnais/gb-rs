@@ -13,8 +13,7 @@ fn to_u16(msb: u8, lsb: u8) -> u16 {
 
 fn test_bit(data: u16, index: u16) -> bool {
     // Returns true if nth bit of data is set
-    let bit_set = 1 << index;
-    data & bit_set == bit_set
+    data & (1 << index) != 0
 }
 
 mod cpu;
@@ -42,6 +41,7 @@ fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
 
         // TODO update timer
 
+        cpu.check_interupts(mmu);
         cycles += cpu_cycles as u64;
     }
 

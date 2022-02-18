@@ -8,10 +8,15 @@ use crate::timer::TMC;
 use crate::to_u16;
 use crate::to_u8;
 
+const INT_REQUEST_REGISTER: u16 = 0xFF0F; // Interupt Request Register
+const INT_ENABLED_REGISTER: u16 = 0xFFFF; // Interupt Enabled Register
+
 pub struct Mmu<'a> {
     cartridge: &'a mut Cartridge,
     pub memory: [u8; 0x10000],
-    timer: Timer,
+    pub timer: Timer,
+    pub int_request: u8, // Interupt Request Register
+    pub int_enabled: u8,
 }
 
 impl<'a> Mmu<'a> {
@@ -20,6 +25,8 @@ impl<'a> Mmu<'a> {
             cartridge,
             memory: [0; 0x10000],
             timer: Timer::new(),
+            int_request: 0,
+            int_enabled: 0
         };
 
         mmu.memory[0xFF05] = 0x00;
@@ -61,6 +68,7 @@ impl<'a> Mmu<'a> {
         match addr {
             0..=0x7fff | 0xA000..=0xBFFF => self.cartridge.readb(addr),
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.readb(addr),
+            INT_REQUEST_REGISTER => self.int_request,
             _ =>  self.memory[addr as usize]
         }
     }
@@ -82,6 +90,7 @@ impl<'a> Mmu<'a> {
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.writeb(addr, value),
             0xfea0..=0xfeff => (), // Restricted
             lcd::SCANLINE_REGISTER => self.memory[lcd::SCANLINE_REGISTER as usize] = 0, // Reset if write
+            INT_REQUEST_REGISTER => self.int_request = value,
             n => self.memory[n as usize] = value,
         };
     }
@@ -91,5 +100,10 @@ impl<'a> Mmu<'a> {
 
         self.writeb(addr, lsb);
         self.writeb(addr + 1, msb);
+    }
+
+    pub fn request_interupt(&mut self, id: u8) {
+        // Sets bit 'id'th in interupt request register
+        self.int_request |= 1 << id;
     }
 }
