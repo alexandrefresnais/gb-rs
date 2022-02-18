@@ -213,16 +213,22 @@ impl Cpu {
             0xd6 | 0xde => { let val = self.readb(mmu); self.sub(val, opcode == 0xde); 8 }, // SUB A, u8 or SBC A, u8
             0xda => { if self.reg.get_c() { self.reg.pc = self.readw(mmu); 16 } else { 12 } }, // JP C, u16
 
+            0xe0 => { let addr = 0xff00 + self.readb(mmu) as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+u8), A
             0xe1 => { let hl = self.pop(mmu); self.reg.set_hl(hl); 12 }, // POP HL
+            0xe2 => { let addr = 0xff00 + self.reg.c as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+C), A
             0xe5 => { self.push(mmu, self.reg.hl()); 16 }, // PUSH HL
             0xe6 => { let val = self.readb(mmu); self.and(val); 8 }, // AND A, u8
+            0xea => { let addr = self.readw(mmu); mmu.writeb(addr, self.reg.a); 16 }, // LD (u16), A
             0xee => { let val = self.readb(mmu); self.xor(val); 8 }, // XOR A, u8
 
+            0xf0 => { let addr = 0xff00 + self.readb(mmu) as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+u8)
             0xf1 => { let af = self.pop(mmu); self.reg.set_af(af); 12 }, // POP AF
+            0xf2 => { let addr = 0xff00 + self.reg.c as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+C)
             0xf3 => { self.ime = false; 4 }, // DI
             0xf5 => { self.push(mmu, self.reg.af()); 16 }, // PUSH AF
             0xf6 => { let val = self.readb(mmu); self.or(val); 8 }, // OR A, u8
-            0xfb => { self.ime = true; 4 } // EI
+            0xfa => { let addr = self.readw(mmu); self.reg.a = mmu.readb(addr); 16 }, // LD A, (u16)
+            0xfb => { self.ime = true; 4 }, // EI
             0xfe => { let val = self.readb(mmu); self.cp(val); 8 }, // CP A, u8
             _ => panic!("Unknown opcode {:#04x} at {:#04x}.", opcode, self.reg.pc - 1)
         }
