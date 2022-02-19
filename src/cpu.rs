@@ -31,7 +31,7 @@ impl Cpu {
     }
 
     // TODO: better jr
-    pub fn run_cycle(&mut self, mmu: &mut Mmu) -> u8 {
+    pub fn run_cycle(&mut self, mmu: &mut Mmu) -> u32 {
         // In this implementation, the Cpu will give the number of cycle
         // to run on other components
         let opcode = self.readb(mmu);
@@ -44,12 +44,14 @@ impl Cpu {
             0x04 => { self.reg.b = self.inc(self.reg.b); 4 }, // INC B
             0x05 => { self.reg.b = self.dec(self.reg.b); 4 }, // DEC B
             0x06 => { self.reg.b = self.readb(mmu); 8 }, // LD B, u8
+            0x07 => { self.reg.a = self.rlc(self.reg.a); self.reg.set_z(false); 4 }, // RLCA
             0x08 => { let addr = self.readw(mmu); mmu.writew(addr, self.reg.sp); 20 }, // LD (u16), SP
             0x0a => { let bc = self.reg.bc(); self.reg.a = mmu.readb(bc); 8 }, // LD A, (BC)
             0x0b => { let bc = self.reg.bc(); self.reg.set_bc(bc.wrapping_sub(1)); 8 }, // DEC BC
             0x0c => { self.reg.c = self.inc(self.reg.c); 4 }, // INC C
             0x0d => { self.reg.c = self.dec(self.reg.c); 4 }, // DEC C
             0x0e => { self.reg.c = self.readb(mmu); 8 }, // LD C, u8
+            0x0f => { self.reg.a = self.rrc(self.reg.a); self.reg.set_z(false); 4 }, // RRCA
             0x10 => 4, // STOP
             0x11 => { let w = self.readw(mmu); self.reg.set_de(w); 12 }, // LD DE, n16
             0x12 => { mmu.writeb(self.reg.de(), self.reg.a); 8 }, // LD (DE), A
@@ -57,12 +59,14 @@ impl Cpu {
             0x14 => { self.reg.d = self.inc(self.reg.d); 4 }, // INC D
             0x15 => { self.reg.d = self.dec(self.reg.d); 4 }, // DEC D
             0x16 => { self.reg.d = self.readb(mmu); 8 }, // LD D, u8
+            0x17 => { self.reg.a = self.rl(self.reg.a); self.reg.set_z(false); 4 }, // RLA
             0x18 => { let delta = self.readb(mmu); self.jr(delta as i8); 12 }, // JR i8
             0x1a => { let de = self.reg.de(); self.reg.a = mmu.readb(de); 8 }, // LD A, (DE)
             0x1b => { let de = self.reg.de(); self.reg.set_de(de.wrapping_sub(1)); 8 }, // DEC DE
             0x1c => { self.reg.e = self.inc(self.reg.e); 4 }, // INC E
             0x1d => { self.reg.e = self.dec(self.reg.e); 4 }, // DEC E
             0x1e => { self.reg.e = self.readb(mmu); 8 }, // LD E, u8
+            0x1f => { self.reg.a = self.rr(self.reg.a); self.reg.set_z(false); 4 }, // RRA
             0x20 => { let delta = self.readb(mmu); if self.reg.get_z() { 8 } else { self.jr(delta as i8); 12 } } // JR NZ, i8
             0x21 => { let w = self.readw(mmu); self.reg.set_hl(w); 12 }, // LD HL, n16
             0x22 => { mmu.writeb(self.reg.hl(), self.reg.a); self.inc_hl(); 8 }, // LD (HL+), A
@@ -212,20 +216,26 @@ impl Cpu {
             0xbe => { let val = mmu.readb(self.reg.hl()); self.cp(val); 8 }, // CP A, (HL)
             0xbf => { self.cp(self.reg.a); 4 }, // CP A, A
 
+            0xc0 => { if self.reg.get_z() { 8 } else { self.reg.pc = self.pop(mmu); 20 }}, // RET NZ
             0xc1 => { let bc = self.pop(mmu); self.reg.set_bc(bc); 12 }, // POP BC
             0xc2 => { if self.reg.get_z() { 12 } else { self.reg.pc = self.readw(mmu); 16 } }, // JP NZ, u16
             0xc3 => { self.reg.pc = self.readw(mmu); 16 }, // JP u16
+            0xc4 => { let addr = self.readw(mmu); if self.reg.get_z() { 12 } else { self.call(mmu, addr); 24 }}, // CALL NZ, u16
             0xc5 => { self.push(mmu, self.reg.bc()); 16 }, // PUSH BC
             0xc6 | 0xce => { let val = self.readb(mmu); self.add(val, opcode == 0xce); 8 }, // ADD A, u8 or ADC A, u8
+            0xc8 => { if self.reg.get_z() { self.reg.pc = self.pop(mmu); 20 } else { 8 }}, // RET Z
             0xc9 => { self.reg.pc = self.pop(mmu); 16 }, // RET
             0xca => { if self.reg.get_z() { self.reg.pc = self.readw(mmu); 16 } else { 12 } }, // JP Z, u16
+            0xcc => { let addr = self.readw(mmu); if self.reg.get_z() { self.call(mmu, addr); 24 } else { 12 }}, // CALL Z, u16
             0xcd => { let addr = self.readw(mmu); self.call(mmu, addr); 24 }, // CALL u16
 
+            0xd0 => { if self.reg.get_c() { 8 } else { self.reg.pc = self.pop(mmu); 20 }}, // RET NC
             0xd1 => { let de = self.pop(mmu); self.reg.set_de(de); 12 }, // POP DE
 
             0xd2 => { if self.reg.get_c() { 12 } else { self.reg.pc = self.readw(mmu); 16 } }, // JP NC, u16
             0xd5 => { self.push(mmu, self.reg.de()); 16 }, // PUSH DE
             0xd6 | 0xde => { let val = self.readb(mmu); self.sub(val, opcode == 0xde); 8 }, // SUB A, u8 or SBC A, u8
+            0xd8 => { if self.reg.get_c() { self.reg.pc = self.pop(mmu); 20 } else { 8 }}, // RET C
             0xda => { if self.reg.get_c() { self.reg.pc = self.readw(mmu); 16 } else { 12 } }, // JP C, u16
 
             0xe0 => { let addr = 0xff00 | self.readb(mmu) as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+u8), A
@@ -233,6 +243,7 @@ impl Cpu {
             0xe2 => { let addr = 0xff00 | self.reg.c as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+C), A
             0xe5 => { self.push(mmu, self.reg.hl()); 16 }, // PUSH HL
             0xe6 => { let val = self.readb(mmu); self.and(val); 8 }, // AND A, u8
+            0xe9 => { self.reg.pc = self.reg.hl(); 4 }, // JP HL
             0xea => { let addr = self.readw(mmu); mmu.writeb(addr, self.reg.a); 16 }, // LD (u16), A
             0xee => { let val = self.readb(mmu); self.xor(val); 8 }, // XOR A, u8
 
@@ -303,6 +314,54 @@ impl Cpu {
         self.reg.set_z(self.reg.a == 0);
         self.reg.set_c(false);
         self.reg.set_n(false);
+    }
+
+    fn rlc(&mut self, value: u8) -> u8 {
+        // Rotate left
+        let res = value.rotate_left(1);
+        self.reg.set_z(res == 0);
+        self.reg.set_c(value.is_set(7));
+        self.reg.set_h(false);
+        self.reg.set_n(false);
+        res
+    }
+
+    fn rl(&mut self, value: u8) -> u8 {
+        // Rotate left through carry
+        let mut res = value << 1;
+        if self.reg.get_c() {
+            res |= 1;
+        }
+
+        self.reg.set_z(res == 0);
+        self.reg.set_c(value.is_set(7));
+        self.reg.set_h(false);
+        self.reg.set_n(false);
+        res
+    }
+
+    fn rrc(&mut self, value: u8) -> u8 {
+        // Rotate right
+        let res = value.rotate_right(1);
+        self.reg.set_z(res == 0);
+        self.reg.set_c(value.is_set(0));
+        self.reg.set_h(false);
+        self.reg.set_n(false);
+        res
+    }
+
+    fn rr(&mut self, value: u8) -> u8 {
+        // Rotate right through carry
+        let res = value >> 1;
+        if self.reg.get_c() {
+            res.set_bit(7);
+        }
+
+        self.reg.set_z(res == 0);
+        self.reg.set_c(value.is_set(0));
+        self.reg.set_h(false);
+        self.reg.set_n(false);
+        res
     }
 
     fn cp(&mut self, value: u8)
