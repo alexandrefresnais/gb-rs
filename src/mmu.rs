@@ -1,5 +1,7 @@
-use crate::lcd;
 use crate::cartridge::Cartridge;
+use crate::lcd::Lcd;
+use crate::lcd::SCANLINE_REGISTER;
+use crate::lcd::STATUS_REGISTER;
 use crate::timer::Timer;
 use crate::timer::DIVIDER_REGISTER;
 use crate::timer::TIMA;
@@ -14,6 +16,7 @@ const INT_ENABLED_REGISTER: u16 = 0xFFFF; // Interupt Enabled Register
 pub struct Mmu<'a> {
     cartridge: &'a mut Cartridge,
     pub memory: [u8; 0x10000],
+    pub lcd: Lcd,
     pub timer: Timer,
     pub int_request: u8, // Interupt Request Register
     pub int_enabled: u8,
@@ -24,9 +27,10 @@ impl<'a> Mmu<'a> {
         let mut mmu = Mmu {
             cartridge,
             memory: [0; 0x10000],
+            lcd: Lcd::new(),
             timer: Timer::new(),
             int_request: 0,
-            int_enabled: 0
+            int_enabled: 0,
         };
 
         mmu.memory[0xFF05] = 0x00;
@@ -68,8 +72,9 @@ impl<'a> Mmu<'a> {
         match addr {
             0..=0x7fff | 0xA000..=0xBFFF => self.cartridge.readb(addr),
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.readb(addr),
+            SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.readb(addr),
             INT_REQUEST_REGISTER => self.int_request,
-            _ =>  self.memory[addr as usize]
+            _ => self.memory[addr as usize],
         }
     }
 
@@ -86,10 +91,10 @@ impl<'a> Mmu<'a> {
             0xe000..=0xfdff => {
                 self.memory[addr as usize] = value;
                 self.writeb(addr - 0x2000, value)
-            }, // ECHO RAM
+            } // ECHO RAM
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.writeb(addr, value),
             0xfea0..=0xfeff => (), // Restricted
-            lcd::SCANLINE_REGISTER => self.memory[lcd::SCANLINE_REGISTER as usize] = 0, // Reset if write
+            SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.writeb(addr, value),
             INT_REQUEST_REGISTER => self.int_request = value,
             n => self.memory[n as usize] = value,
         };
