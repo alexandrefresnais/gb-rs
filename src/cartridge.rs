@@ -4,7 +4,7 @@ const RAM_BANK_SIZE: u16 = 0x2000;
 const NB_RAM_BANK: u16 = 4;
 const RAM_SIZE: usize = (NB_RAM_BANK * RAM_BANK_SIZE) as usize;
 
-use crate::test_bit;
+use crate::utils::Bits;
 
 // A000-BFFF RAM bank from cartridge if any (switchable)
 
@@ -112,7 +112,7 @@ impl Cartridge {
 
         if let Some(MBC::MBC2) = self.mbc {
             // In case of MBC2, bit 4 must not be set
-            if test_bit(addr, 4) {
+            if addr.is_set(4) {
                 return;
             }
         }

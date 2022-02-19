@@ -2,7 +2,7 @@ use crate::registers::Registers;
 use crate::mmu::Mmu;
 use crate::to_u8;
 use crate::to_u16;
-use crate::test_bit;
+use crate::utils::Bits;
 
 // Address of interupts routines
 const V_BLANK_ROUTINE: u16 = 0x40;
@@ -430,7 +430,7 @@ impl Cpu {
         let requested = mmu.int_request as u16;
         let enabled = mmu.int_enabled as u16;
         for interupt in 0..=4 {
-            if test_bit(requested, interupt as u16) && test_bit(enabled, interupt as u16) {
+            if requested.is_set(interupt) && enabled.is_set(interupt) {
                 self.execute_interupt(interupt, mmu);
             }
         }

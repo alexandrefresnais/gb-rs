@@ -11,17 +11,13 @@ fn to_u16(msb: u8, lsb: u8) -> u16 {
     ((msb as u16) << 8) | lsb as u16
 }
 
-fn test_bit(data: u16, index: u16) -> bool {
-    // Returns true if nth bit of data is set
-    data & (1 << index) != 0
-}
-
 mod cpu;
 mod mmu;
 mod registers;
 mod lcd;
 mod cartridge;
 mod timer;
+mod utils;
 
 use cpu::Cpu;
 use mmu::Mmu;

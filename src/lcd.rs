@@ -1,7 +1,7 @@
 use crate::cpu::LCD_INTERUPT;
 use crate::cpu::V_BLANK_INTERUPT;
 use crate::mmu::Mmu;
-use crate::test_bit;
+use crate::utils::Bits;
 
 // Memory address storing the current scanline
 pub const SCANLINE_REGISTER: u16 = 0xFF44;
@@ -27,7 +27,7 @@ impl Lcd {
     }
 
     fn is_lcd_enabled(&self, mmu: &mut Mmu) -> bool {
-        test_bit(mmu.readb(LCD_CONTROL_REGISTER) as u16, 7)
+        mmu.readb(LCD_CONTROL_REGISTER).is_set(7)
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
@@ -70,9 +70,24 @@ impl Lcd {
 
             if self.curr_line > 153 {
                 self.curr_line = 0;
+            } else if self.curr_line < 144 {
+                self.draw_scanline(mmu);
             }
         }
     }
+
+    fn draw_scanline(&mut self, mmu: &mut Mmu) {
+        let control = mmu.readb(LCD_CONTROL_REGISTER);
+        if control.is_set(0) {
+            self.render_tiles(mmu);
+        } else if control.is_set(1) {
+            self.render_sprites(mmu);
+        }
+    }
+
+    fn render_tiles(&mut self, mmu: &mut Mmu) {}
+
+    fn render_sprites(&mut self, mmu: &mut Mmu) {}
 
     fn set_lcd_status(&mut self, mmu: &mut Mmu) {
         if !self.is_lcd_enabled(mmu) {
@@ -93,7 +108,7 @@ impl Lcd {
             mode = 1;
             status |= 1;
             status &= 0b11111101;
-            reqInt = test_bit(status as u16, 4);
+            reqInt = status.is_set(4);
         } else {
             let mode2bounds = 456 - 80;
             let mode3bounds = mode2bounds - 172;
@@ -103,7 +118,7 @@ impl Lcd {
                 mode = 2;
                 status |= 0b10;
                 status &= 0b11111110;
-                reqInt = test_bit(status as u16, 5);
+                reqInt = status.is_set(5);
             }
             // mode 3
             else if self.scanlines_cycles >= mode3bounds {
@@ -114,7 +129,7 @@ impl Lcd {
             else {
                 mode = 0;
                 status &= 0b11111100;
-                reqInt = test_bit(status as u16, 3);
+                reqInt = status.is_set(3);
             }
         }
 
@@ -125,11 +140,10 @@ impl Lcd {
 
         if self.curr_line == mmu.readb(0xFF45) {
             status |= 1 << 2;
-            if test_bit(status as u16, 6) {
+            if status.is_set(6) {
                 mmu.request_interupt(LCD_INTERUPT);
             }
-        }
-        else {
+        } else {
             status &= !(1 << 2);
         }
 

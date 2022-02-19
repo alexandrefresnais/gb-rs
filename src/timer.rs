@@ -1,5 +1,5 @@
 use crate::mmu::Mmu;
-use crate::test_bit;
+use crate::utils::Bits;
 use crate::cpu::TIMER_INTERUPT;
 
 pub const DIVIDER_REGISTER: u16 = 0xFF04;
@@ -73,7 +73,7 @@ impl Timer {
 
     fn is_clock_enabled(&self, mmu: &Mmu) -> bool {
         // TODO: Why not use self.time_controller
-        test_bit(mmu.readb(TMC) as u16, 2)
+        mmu.readb(TMC).is_set(2)
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
