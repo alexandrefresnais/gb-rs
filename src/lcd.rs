@@ -8,13 +8,39 @@ pub const SCANLINE_REGISTER: u16 = 0xFF44;
 pub const STATUS_REGISTER: u16 = 0xFF41;
 pub const LCD_CONTROL_REGISTER: u16 = 0xFF40;
 
+// Background is 256x256 but view is 160x144
+pub const SCROLL_Y_REGISTER: u16 = 0xFF42; // Y Position of the bg to start drawing the viewing area from
+pub const SCROLL_X_REGISTER: u16 = 0xFF43; // X Position of the bg to start drawing the viewing area from
+pub const WINDOW_Y_REGISTER: u16 = 0xFF4A; // Y Position of the viewing aera to start drawing the window from
+pub const WINDOW_X_REGISTER: u16 = 0xFF4B; // X Position -7 of the viewing aera to start drawing the window from
+
 // Number of cpu clock cycles it takes to draw on scanline
 const SCANLINE_CYCLES: i64 = 456;
+
+#[derive(Copy, Clone)]
+enum Color {
+    White,
+    DarkGrey,
+    LightGrey,
+    Black
+}
+
+impl Color {
+    fn rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Color::White => (255, 255, 255),
+            Color::DarkGrey => (0xcc, 0xcc, 0xcc),
+            Color::LightGrey => (0x77, 0x77, 0x77),
+            Color::Black => (0, 0, 0),
+        }
+    }
+}
 
 pub struct Lcd {
     scanlines_cycles: i64,
     curr_line: u8,
     status: u8,
+    screen_data: [[Color; 144]; 160],
 }
 
 impl Lcd {
@@ -23,6 +49,7 @@ impl Lcd {
             scanlines_cycles: SCANLINE_CYCLES,
             curr_line: 0,
             status: 0,
+            screen_data: [[Color::White; 144]; 160],
         }
     }
 
@@ -85,9 +112,168 @@ impl Lcd {
         }
     }
 
-    fn render_tiles(&mut self, mmu: &mut Mmu) {}
+    fn render_tiles(&mut self, mmu: &mut Mmu) {
+        // Tiles form the background and are not interactive.
+        // Size: 8x8
 
-    fn render_sprites(&mut self, mmu: &mut Mmu) {}
+        let scrollX = mmu.readb(SCROLL_X_REGISTER);
+        let scrollY = mmu.readb(SCROLL_Y_REGISTER);
+        let windowX = mmu.readb(WINDOW_X_REGISTER);
+        let windowY = mmu.readb(WINDOW_Y_REGISTER) - 7;
+
+        let lcd_control = mmu.readb(LCD_CONTROL_REGISTER);
+
+        // Check if window is set and current scanline has window
+        let draw_window: bool = lcd_control.is_set(5) && windowY <= self.curr_line;
+
+        let mut tile_data: u16 = 0x8000;
+        let mut unsig_op = true;
+
+        if !lcd_control.is_set(4) {
+            tile_data = 0x8800;
+            unsig_op = false;
+        }
+
+        // TODO: opti
+        let background_memory: u16 = match draw_window {
+            true => if lcd_control.is_set(6) { 0x9c00 } else { 0x9800 },
+            false => if lcd_control.is_set(3) { 0x9c00 } else { 0x9800 },
+        };
+
+        // Which of the 32 Y tiles we are drawing
+        let y_tile: u8 = match draw_window {
+            true => self.curr_line - windowY,
+            false => scrollY + self.curr_line,
+        };
+
+        // Which of 8 pixel of tile are we drawinf
+        let tile_row = (y_tile / 8) * 32;
+
+        // Draw the 160 horizontal pixels
+        for pixel in 0..160 {
+            let mut x_pos = pixel + scrollX;
+            if draw_window && pixel >= windowX {
+                x_pos = pixel - windowX;
+            }
+
+            // which of the 32 horizontal tiles
+            let tile_col: u16 = (x_pos / 8) as u16;
+
+            let tile_addr: u16 = background_memory + tile_row as u16 + tile_col;
+            let tile_num: u8 = mmu.readb(tile_addr);
+
+            let tile_location: u16 = match unsig_op {
+                true => (tile_data + (tile_num as u16 * 16)) as u16,
+                false => (((tile_num as i8 as i16) + 128) * 16) as u16,
+            };
+
+            // Each 8 pixels line is encode on 2 bytes
+            let line: u8 = (y_tile % 8) * 2;
+            let color_data_1 = mmu.readb(tile_location + line as u16);
+            let color_data_2 = mmu.readb(tile_location + line as u16 + 1);
+
+            // The ith pixel color is the combination of 7-ith bit of color_data_1
+            // and 7-ith bit of color_data_2
+            let color_bit = 7 - (x_pos % 8);
+
+            let color_id = color_data_2.get_bit(color_bit) << 1 | color_data_1.get_bit(color_bit);
+            let color: Color = self.get_color(mmu, color_id, 0xff47);
+
+            // Safety check
+            if self.curr_line > 143 || pixel > 159 {
+                continue;
+            }
+
+            self.screen_data[pixel as usize][self.curr_line as usize] = color;
+        }
+    }
+
+    fn get_color(&self, mmu: &Mmu, palette_id: u8, palette_addr: u16) -> Color {
+        let palette: u8 = mmu.readb(palette_addr);
+
+        let color_id = match palette_id & 0b11 {
+            0b00 => palette & 0b11,
+            0b01 => palette & 0b1100 >> 2,
+            0b10 => palette & 0b110000 >> 4,
+            0b11 => palette & 0b11000000 >> 6,
+            _ => panic! ("Should not happend!")
+        };
+
+        match color_id {
+            0b00 => Color::White,
+            0b01 => Color::LightGrey,
+            0b10 => Color::DarkGrey,
+            0b11 => Color::Black,
+            _ => panic! ("Should not happend!")
+        }
+    }
+
+    fn render_sprites(&mut self, mmu: &mut Mmu) {
+        // Interactive graphics
+        let lcd_control = mmu.readb(LCD_CONTROL_REGISTER);
+
+        let use8x16 = lcd_control.is_set(2);
+
+        // 40 tiles located in memory region 0x8000-0x8FFF
+        for sprite in 0..40 {
+            // sprite are 4 bytes wide
+            let index: u8 = sprite * 4;
+
+            let y_pos = mmu.readb(0xFE00 + index as u16) - 16;
+            let x_pos = mmu.readb(0xFE00 + index as u16 + 1) - 8;
+            let tile_location = mmu.readb(0xFE00 + index as u16 + 2);
+            let attributes = mmu.readb(0xFE00 + index as u16 + 3);
+
+            let y_flip = attributes.is_set(6);
+            let x_flip = attributes.is_set(5);
+
+            let y_size = match use8x16 {
+                true => 16,
+                false => 8
+            };
+
+            if (y_pos..(y_pos + y_size)).contains(&self.curr_line) {
+                let mut line = self.curr_line - y_pos;
+
+                if y_flip {
+                    line = y_size - line;
+                }
+
+                // Each 8 pixels line is encode on 2 bytes
+                line *= 2;
+                let data_addr: u16 = (0x8000 + (tile_location as u16 * 16)) + line as u16;
+                let color_data_1 = mmu.readb(data_addr);
+                let color_data_2 = mmu.readb(data_addr + 1);
+
+                // Doing in reverse because color or stored reversed
+                for tile_pixel in (0..8).rev() {
+                    let mut color_bit = tile_pixel;
+                    if x_flip {
+                        color_bit = 7 - color_bit;
+                    }
+
+                    let color_id = color_data_2.get_bit(color_bit) << 1 | color_data_1.get_bit(color_bit);
+
+                    let palette_addr = if attributes.is_set(4) { 0xFF49 } else { 0xFF48 };
+                    let color = self.get_color(mmu, color_id, palette_addr);
+
+                    // transparent
+                    if let Color::White = color {
+                        continue;
+                    }
+
+                    // reverse back
+                    let pixel = x_pos + (7 - tile_pixel);
+                    // Safety check
+                    if self.curr_line > 143 || pixel > 159 {
+                        continue;
+                    }
+
+                    self.screen_data[pixel as usize][self.curr_line as usize] = color;
+                }
+            }
+        }
+    }
 
     fn set_lcd_status(&mut self, mmu: &mut Mmu) {
         if !self.is_lcd_enabled(mmu) {

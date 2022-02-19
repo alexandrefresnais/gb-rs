@@ -1,16 +1,25 @@
 pub trait Bits {
+    // Returns true if bit at index is set
     fn is_set(&self, index: u8) -> bool;
+    // Returns 1 if bit at index is set
+    fn get_bit(&self, index: u8) -> u8;
 }
 
 impl Bits for u8 {
     fn is_set(&self, index: u8) -> bool {
         return self & (1 << index) != 0;
     }
+    fn get_bit(&self, index: u8) -> u8 {
+        self.is_set(index) as u8
+    }
 }
 
 impl Bits for u16 {
     fn is_set(&self, index: u8) -> bool {
         return self & (1 << index) != 0;
+    }
+    fn get_bit(&self, index: u8) -> u8 {
+        self.is_set(index) as u8
     }
 }
 
