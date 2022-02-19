@@ -13,6 +13,7 @@ use crate::to_u8;
 const INT_REQUEST_REGISTER: u16 = 0xFF0F; // Interupt Request Register
 const INT_ENABLED_REGISTER: u16 = 0xFFFF; // Interupt Enabled Register
 
+// TODO: make an interupt register object
 pub struct Mmu<'a> {
     cartridge: &'a mut Cartridge,
     pub memory: [u8; 0x10000],
@@ -74,6 +75,7 @@ impl<'a> Mmu<'a> {
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.readb(addr),
             SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.readb(addr),
             INT_REQUEST_REGISTER => self.int_request,
+            INT_ENABLED_REGISTER => self.int_enabled,
             _ => self.memory[addr as usize],
         }
     }
@@ -97,6 +99,7 @@ impl<'a> Mmu<'a> {
             0xff46 => self.do_dma(value),
             SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.writeb(addr, value),
             INT_REQUEST_REGISTER => self.int_request = value,
+            INT_ENABLED_REGISTER => self.int_enabled = value,
             n => self.memory[n as usize] = value,
         };
     }
@@ -119,5 +122,10 @@ impl<'a> Mmu<'a> {
             let b = self.readb(base + i);
             self.writeb(0xFE00 + i, b);
         }
+    }
+
+    pub fn update(&mut self, cycles: u32) {
+        self.timer.update(cycles);
+        self.int_request |= self.timer.int_request;
     }
 }

@@ -1,4 +1,3 @@
-use crate::mmu::Mmu;
 use crate::utils::Bits;
 use crate::cpu::TIMER_INTERUPT;
 
@@ -19,17 +18,18 @@ pub const TMC: u16 = 0xFF07;
 
 const CLOCK_SPEED: u32 = 4194304;
 
-pub struct Timer{
+pub struct Timer {
     timer_controller: u8, // TMC
     timer: u32, // TIMA
     timer_modulo: u8, // TMA
     timer_cycles: u32, // elasped cycles since last timer inc
     timer_frequency: u32, // Cycles quantity to increment timer
     divider_cycles: u32,
-    divider: u8 //DIV
+    divider: u8, //DIV
+    pub int_request: u8,
 }
 
-impl Timer {
+impl Timer  {
     pub fn new() -> Self {
         Timer {
             timer_controller: 0,
@@ -38,11 +38,12 @@ impl Timer {
             timer_cycles: 0,
             timer_frequency: 256,
             divider_cycles: 0,
-            divider: 0
+            divider: 0,
+            int_request: 0
         }
     }
 
-    pub fn update(&mut self, cycles: u32, mmu: &mut Mmu) {
+    pub fn update(&mut self, cycles: u32) {
         // cycles: how many CPU cycles have run
 
         self.divider_cycles += cycles;
@@ -51,7 +52,7 @@ impl Timer {
             self.divider_cycles %= 256;
         }
 
-        if !self.is_clock_enabled(mmu) {
+        if !self.is_clock_enabled() {
             return
         }
 
@@ -62,7 +63,7 @@ impl Timer {
                 // About to overflow, set it to TMA
                 self.timer = self.timer_modulo as u32;
 
-                mmu.request_interupt(TIMER_INTERUPT as u8);
+                self.int_request |= 1 << TIMER_INTERUPT;
             }
             else {
                 self.timer += 1;
@@ -71,9 +72,8 @@ impl Timer {
         }
     }
 
-    fn is_clock_enabled(&self, mmu: &Mmu) -> bool {
-        // TODO: Why not use self.time_controller
-        mmu.readb(TMC).is_set(2)
+    fn is_clock_enabled(&self) -> bool {
+        self.timer_controller.is_set(2)
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
