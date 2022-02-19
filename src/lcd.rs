@@ -1,12 +1,19 @@
 use crate::cpu::LCD_INTERUPT;
 use crate::cpu::V_BLANK_INTERUPT;
-use crate::mmu::Mmu;
 use crate::utils::Bits;
+
+pub const CONTROL_REGISTER: u16 = 0xFF40;
+pub const STATUS_REGISTER: u16 = 0xFF41;
 
 // Memory address storing the current scanline
 pub const SCANLINE_REGISTER: u16 = 0xFF44;
-pub const STATUS_REGISTER: u16 = 0xFF41;
-pub const LCD_CONTROL_REGISTER: u16 = 0xFF40;
+
+pub const LYC_REGISTER: u16 = 0xFF45;
+
+// Palette to fetch colors from color id
+pub const BG_PALETTE: u16 = 0xFF47;
+pub const OBJ_PALETTE_0: u16 = 0xFF48;
+pub const OBJ_PALETTE_1: u16 = 0xFF49;
 
 // Background is 256x256 but view is 160x144
 pub const SCROLL_Y_REGISTER: u16 = 0xFF42; // Y Position of the bg to start drawing the viewing area from
@@ -16,6 +23,15 @@ pub const WINDOW_X_REGISTER: u16 = 0xFF4B; // X Position -7 of the viewing aera 
 
 // Number of cpu clock cycles it takes to draw on scanline
 const SCANLINE_CYCLES: i64 = 456;
+
+pub const VRAM_START: u16 = 0x8000;
+pub const VRAM_SIZE: u16 = 0x2000;
+pub const VRAM_END: u16 = VRAM_START + VRAM_SIZE - 1;
+
+// Sprite attribute table
+pub const OAM_START: u16 = 0xFE00;
+pub const OAM_SIZE: u16 = 0x100;
+pub const OAM_END: u16 = OAM_START + OAM_SIZE - 1;
 
 #[derive(Copy, Clone)]
 enum Color {
@@ -37,49 +53,93 @@ impl Color {
 }
 
 pub struct Lcd {
+    vram: [u8; VRAM_SIZE as usize],
+    oam: [u8; OAM_SIZE as usize],
     scanlines_cycles: i64,
-    curr_line: u8,
+    curr_line: u8, // LY
+    lyc: u8,
     status: u8,
+    control: u8,
     screen_data: [[Color; 144]; 160],
+    scroll_x: u8,
+    scroll_y: u8,
+    window_x: u8,
+    window_y: u8,
+    bg_palette: u8,
+    obj0_palette: u8,
+    obj1_palette: u8,
+    pub int_request: u8,
 }
 
 impl Lcd {
     pub fn new() -> Self {
         Lcd {
+            vram: [0; VRAM_SIZE as usize],
+            oam: [0; OAM_SIZE as usize],
             scanlines_cycles: SCANLINE_CYCLES,
             curr_line: 0,
+            lyc: 0,
             status: 0,
+            control: 0x91,
             screen_data: [[Color::White; 144]; 160],
+            scroll_x: 0,
+            scroll_y: 0,
+            window_x: 0,
+            window_y: 0,
+            bg_palette: 0,
+            obj0_palette: 0,
+            obj1_palette: 1,
+            int_request: 0,
         }
     }
 
-    fn is_lcd_enabled(&self, mmu: &mut Mmu) -> bool {
-        mmu.readb(LCD_CONTROL_REGISTER).is_set(7)
+    fn is_lcd_enabled(&self) -> bool {
+        self.control.is_set(7)
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
         match addr {
+            VRAM_START..=VRAM_END => self.vram[(addr - VRAM_START) as usize],
+            OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize],
             SCANLINE_REGISTER => self.curr_line,
             STATUS_REGISTER => self.status,
+            CONTROL_REGISTER => self.control,
+            BG_PALETTE => self.bg_palette,
+            OBJ_PALETTE_0 => self.obj0_palette,
+            OBJ_PALETTE_1 => self.obj1_palette,
+            SCROLL_X_REGISTER => self.scroll_x,
+            SCROLL_Y_REGISTER => self.scroll_y,
+            WINDOW_X_REGISTER => self.window_x,
+            WINDOW_Y_REGISTER => self.window_y,
+            LYC_REGISTER => self.lyc,
             _ => panic!("Should not happen!"),
         }
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
         match addr {
+            VRAM_START..=VRAM_END => self.vram[(addr - VRAM_START) as usize] = value,
+            OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize] = value,
             SCANLINE_REGISTER => self.curr_line = 0, // Writing resets it
             STATUS_REGISTER => self.status = value,
+            CONTROL_REGISTER => self.control = value,
+            BG_PALETTE => self.bg_palette = value,
+            OBJ_PALETTE_0 => self.obj0_palette = value,
+            OBJ_PALETTE_1 => self.obj1_palette = value,
+            SCROLL_X_REGISTER => self.scroll_x = value,
+            SCROLL_Y_REGISTER => self.scroll_y = value,
+            WINDOW_X_REGISTER => self.window_x = value,
+            WINDOW_Y_REGISTER => self.window_y = value,
+            LYC_REGISTER => self.lyc = value,
             _ => panic!("Should not happen!"),
         }
     }
 
-    pub fn update_graphics(&mut self, cycles: u8, mmu: &mut Mmu) {
+    pub fn update_graphics(&mut self, cycles: u32) {
         // cycles: elasped cycles given by Cpu
-        // We access Mmu memory directly because mmu::writeb() protects SCANLINE_REGISTER
+        self.set_lcd_status();
 
-        self.set_lcd_status(mmu);
-
-        if !self.is_lcd_enabled(mmu) {
+        if !self.is_lcd_enabled() {
             return;
         }
 
@@ -92,58 +152,52 @@ impl Lcd {
             self.scanlines_cycles = SCANLINE_CYCLES;
 
             if self.curr_line == 144 {
-                mmu.request_interupt(V_BLANK_INTERUPT);
+                self.int_request |= 1 << V_BLANK_INTERUPT;
             }
 
             if self.curr_line > 153 {
                 self.curr_line = 0;
             } else if self.curr_line < 144 {
-                self.draw_scanline(mmu);
+                self.draw_scanline();
             }
         }
     }
 
-    fn draw_scanline(&mut self, mmu: &mut Mmu) {
-        let control = mmu.readb(LCD_CONTROL_REGISTER);
-        if control.is_set(0) {
-            self.render_tiles(mmu);
-        } else if control.is_set(1) {
-            self.render_sprites(mmu);
+    fn draw_scanline(&mut self) {
+        if self.control.is_set(0) {
+            self.render_tiles();
+        } else if self.control.is_set(1) {
+            self.render_sprites();
         }
     }
 
-    fn render_tiles(&mut self, mmu: &mut Mmu) {
+    fn render_tiles(&mut self) {
         // Tiles form the background and are not interactive.
         // Size: 8x8
 
-        let scroll_x = mmu.readb(SCROLL_X_REGISTER);
-        let scroll_y = mmu.readb(SCROLL_Y_REGISTER);
-        let window_x = mmu.readb(WINDOW_X_REGISTER);
-        let window_y = mmu.readb(WINDOW_Y_REGISTER) - 7;
-
-        let lcd_control = mmu.readb(LCD_CONTROL_REGISTER);
+        let window_y = self.window_y - 7;
 
         // Check if window is set and current scanline has window
-        let draw_window: bool = lcd_control.is_set(5) && window_y <= self.curr_line;
+        let draw_window: bool = self.control.is_set(5) && window_y <= self.curr_line;
 
         let mut tile_data: u16 = 0x8000;
         let mut unsig_op = true;
 
-        if !lcd_control.is_set(4) {
+        if !self.control.is_set(4) {
             tile_data = 0x8800;
             unsig_op = false;
         }
 
         // TODO: opti
         let background_memory: u16 = match draw_window {
-            true => if lcd_control.is_set(6) { 0x9c00 } else { 0x9800 },
-            false => if lcd_control.is_set(3) { 0x9c00 } else { 0x9800 },
+            true => if self.control.is_set(6) { 0x9c00 } else { 0x9800 },
+            false => if self.control.is_set(3) { 0x9c00 } else { 0x9800 },
         };
 
         // Which of the 32 Y tiles we are drawing
         let y_tile: u8 = match draw_window {
             true => self.curr_line - window_y,
-            false => scroll_y + self.curr_line,
+            false => self.scroll_y + self.curr_line,
         };
 
         // Which of 8 pixel of tile are we drawinf
@@ -151,33 +205,33 @@ impl Lcd {
 
         // Draw the 160 horizontal pixels
         for pixel in 0..160 {
-            let mut x_pos = pixel + scroll_x;
-            if draw_window && pixel >= window_x {
-                x_pos = pixel - window_x;
+            let mut x_pos = pixel + self.scroll_x;
+            if draw_window && pixel >= self.window_x {
+                x_pos = pixel - self.window_x;
             }
 
             // which of the 32 horizontal tiles
             let tile_col: u16 = (x_pos / 8) as u16;
 
             let tile_addr: u16 = background_memory + tile_row as u16 + tile_col;
-            let tile_num: u8 = mmu.readb(tile_addr);
+            let tile_num: u8 = self.readb(tile_addr);
 
             let tile_location: u16 = match unsig_op {
                 true => (tile_data + (tile_num as u16 * 16)) as u16,
-                false => (((tile_num as i8 as i16) + 128) * 16) as u16,
+                false => tile_data + (((tile_num as i8 as i16) + 128) * 16) as u16,
             };
 
             // Each 8 pixels line is encode on 2 bytes
             let line: u8 = (y_tile % 8) * 2;
-            let color_data_1 = mmu.readb(tile_location + line as u16);
-            let color_data_2 = mmu.readb(tile_location + line as u16 + 1);
+            let color_data_1 = self.readb(tile_location + line as u16);
+            let color_data_2 = self.readb(tile_location + line as u16 + 1);
 
             // The ith pixel color is the combination of 7-ith bit of color_data_1
             // and 7-ith bit of color_data_2
             let color_bit = 7 - (x_pos % 8);
 
             let color_id = color_data_2.get_bit(color_bit) << 1 | color_data_1.get_bit(color_bit);
-            let color: Color = self.get_color(mmu, color_id, 0xff47);
+            let color: Color = self.get_color(color_id, self.bg_palette);
 
             // Safety check
             if self.curr_line > 143 || pixel > 159 {
@@ -188,8 +242,7 @@ impl Lcd {
         }
     }
 
-    fn get_color(&self, mmu: &Mmu, palette_id: u8, palette_addr: u16) -> Color {
-        let palette: u8 = mmu.readb(palette_addr);
+    fn get_color(&self, palette_id: u8, palette: u8) -> Color {
 
         let color_id = match palette_id & 0b11 {
             0b00 => palette & 0b11,
@@ -208,21 +261,20 @@ impl Lcd {
         }
     }
 
-    fn render_sprites(&mut self, mmu: &mut Mmu) {
+    fn render_sprites(&mut self) {
         // Interactive graphics
-        let lcd_control = mmu.readb(LCD_CONTROL_REGISTER);
 
-        let use8x16 = lcd_control.is_set(2);
+        let use8x16 = self.control.is_set(2);
 
         // 40 tiles located in memory region 0x8000-0x8FFF
         for sprite in 0..40 {
             // sprite are 4 bytes wide
             let index: u8 = sprite * 4;
 
-            let y_pos = mmu.readb(0xFE00 + index as u16) - 16;
-            let x_pos = mmu.readb(0xFE00 + index as u16 + 1) - 8;
-            let tile_location = mmu.readb(0xFE00 + index as u16 + 2);
-            let attributes = mmu.readb(0xFE00 + index as u16 + 3);
+            let y_pos = self.readb(0xFE00 + index as u16) - 16;
+            let x_pos = self.readb(0xFE00 + index as u16 + 1) - 8;
+            let tile_location = self.readb(0xFE00 + index as u16 + 2);
+            let attributes = self.readb(0xFE00 + index as u16 + 3);
 
             let y_flip = attributes.is_set(6);
             let x_flip = attributes.is_set(5);
@@ -242,8 +294,8 @@ impl Lcd {
                 // Each 8 pixels line is encode on 2 bytes
                 line *= 2;
                 let data_addr: u16 = (0x8000 + (tile_location as u16 * 16)) + line as u16;
-                let color_data_1 = mmu.readb(data_addr);
-                let color_data_2 = mmu.readb(data_addr + 1);
+                let color_data_1 = self.readb(data_addr);
+                let color_data_2 = self.readb(data_addr + 1);
 
                 // Doing in reverse because color or stored reversed
                 for tile_pixel in (0..8).rev() {
@@ -254,8 +306,8 @@ impl Lcd {
 
                     let color_id = color_data_2.get_bit(color_bit) << 1 | color_data_1.get_bit(color_bit);
 
-                    let palette_addr = if attributes.is_set(4) { 0xFF49 } else { 0xFF48 };
-                    let color = self.get_color(mmu, color_id, palette_addr);
+                    let palette = if attributes.is_set(4) { self.obj1_palette } else { self.obj0_palette };
+                    let color = self.get_color(color_id, palette);
 
                     // transparent
                     if let Color::White = color {
@@ -275,8 +327,8 @@ impl Lcd {
         }
     }
 
-    fn set_lcd_status(&mut self, mmu: &mut Mmu) {
-        if !self.is_lcd_enabled(mmu) {
+    fn set_lcd_status(&mut self) {
+        if !self.is_lcd_enabled() {
             // Set mode to 1 and reset scanline
             self.scanlines_cycles = SCANLINE_CYCLES;
             self.curr_line = 0;
@@ -321,13 +373,13 @@ impl Lcd {
 
         // Interupt requested and switch mode
         if req_int && (mode != curr_mode) {
-            mmu.request_interupt(LCD_INTERUPT);
+            self.int_request |= 1 << LCD_INTERUPT;
         }
 
-        if self.curr_line == mmu.readb(0xFF45) {
+        if self.curr_line == self.lyc {
             status |= 1 << 2;
             if status.is_set(6) {
-                mmu.request_interupt(LCD_INTERUPT);
+                self.int_request |= 1 << LCD_INTERUPT;
             }
         } else {
             status &= !(1 << 2);

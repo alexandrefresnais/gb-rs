@@ -1,7 +1,11 @@
 use crate::cartridge::Cartridge;
 use crate::lcd::Lcd;
-use crate::lcd::SCANLINE_REGISTER;
-use crate::lcd::STATUS_REGISTER;
+use crate::lcd::CONTROL_REGISTER;
+use crate::lcd::WINDOW_X_REGISTER;
+use crate::lcd::OAM_START;
+use crate::lcd::OAM_END;
+use crate::lcd::VRAM_START;
+use crate::lcd::VRAM_END;
 use crate::timer::Timer;
 use crate::timer::DIVIDER_REGISTER;
 use crate::timer::TIMA;
@@ -73,7 +77,9 @@ impl<'a> Mmu<'a> {
         match addr {
             0..=0x7fff | 0xA000..=0xBFFF => self.cartridge.readb(addr),
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.readb(addr),
-            SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.readb(addr),
+            VRAM_START..=VRAM_END => self.lcd.readb(addr),
+            OAM_START..=OAM_END => self.lcd.readb(addr),
+            CONTROL_REGISTER..=WINDOW_X_REGISTER => self.lcd.readb(addr),
             INT_REQUEST_REGISTER => self.int_request,
             INT_ENABLED_REGISTER => self.int_enabled,
             _ => self.memory[addr as usize],
@@ -97,7 +103,9 @@ impl<'a> Mmu<'a> {
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.writeb(addr, value),
             0xfea0..=0xfeff => (), // Restricted
             0xff46 => self.do_dma(value),
-            SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.writeb(addr, value),
+            VRAM_START..=VRAM_END => self.lcd.writeb(addr, value),
+            OAM_START..=OAM_END => self.lcd.writeb(addr, value),
+            CONTROL_REGISTER..=WINDOW_X_REGISTER => self.lcd.writeb(addr, value),
             INT_REQUEST_REGISTER => self.int_request = value,
             INT_ENABLED_REGISTER => self.int_enabled = value,
             n => self.memory[n as usize] = value,
@@ -127,5 +135,7 @@ impl<'a> Mmu<'a> {
     pub fn update(&mut self, cycles: u32) {
         self.timer.update(cycles);
         self.int_request |= self.timer.int_request;
+        self.lcd.update_graphics(cycles);
+        self.int_request |= self.lcd.int_request;
     }
 }

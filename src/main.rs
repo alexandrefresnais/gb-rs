@@ -27,16 +27,15 @@ fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
     // GameBoy can execute 4194304 cycles per second
     // We want 60 frames per second
     // So we run 69905 each frame
-    const FRAME_CYLES: u64 = 69905;
+    const FRAME_CYLES: u32 = 69905;
 
-    let mut cycles: u64 = 0;
+    let mut cycles: u32 = 0;
     while cycles < FRAME_CYLES {
         let cpu_cycles = cpu.run_cycle(mmu);
 
-        // TODO update timer
-
+        mmu.update(cpu_cycles);
         cpu.check_interupts(mmu);
-        cycles += cpu_cycles as u64;
+        cycles += cpu_cycles;
     }
 
     // Render the screen
