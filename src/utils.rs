@@ -3,6 +3,8 @@ pub trait Bits {
     fn is_set(&self, index: u8) -> bool;
     // Returns 1 if bit at index is set
     fn get_bit(&self, index: u8) -> u8;
+    fn set_bit(&self, index: u8) -> Self;
+    fn unset_bit(&self, index: u8) -> Self;
 }
 
 impl Bits for u8 {
@@ -12,6 +14,12 @@ impl Bits for u8 {
     fn get_bit(&self, index: u8) -> u8 {
         self.is_set(index) as u8
     }
+    fn set_bit(&self, index: u8) -> u8 {
+        self | ((1 << index) as u8)
+    }
+    fn unset_bit(&self, index: u8) -> u8 {
+        self & !((1 << index) as u8)
+    }
 }
 
 impl Bits for u16 {
@@ -20,6 +28,12 @@ impl Bits for u16 {
     }
     fn get_bit(&self, index: u8) -> u8 {
         self.is_set(index) as u8
+    }
+    fn set_bit(&self, index: u8) -> u16 {
+        self | ((1 << index) as u16)
+    }
+    fn unset_bit(&self, index: u8) -> u16 {
+        self & !((1 << index) as u16)
     }
 }
 
@@ -92,5 +106,29 @@ mod tests {
         assert_eq!(val.is_set(13), false);
         assert_eq!(val.is_set(14), false);
         assert_eq!(val.is_set(15), true);
+    }
+
+    #[test]
+    fn set_bit_u8_1() {
+        let val: u16 = 0b0100_0010;
+        assert_eq!(val.set_bit(0), 0b0100_0011);
+    }
+
+    #[test]
+    fn set_bit_u8_2() {
+        let val: u16 = 0b0100_0010;
+        assert_eq!(val.set_bit(1), 0b0100_0010);
+    }
+
+    #[test]
+    fn unset_bit_u8_1() {
+        let val: u16 = 0b0100_0010;
+        assert_eq!(val.unset_bit(1), 0b0100_0000);
+    }
+
+    #[test]
+    fn unset_bit_u8_2() {
+        let val: u16 = 0b0100_0010;
+        assert_eq!(val.unset_bit(3), 0b0100_0010);
     }
 }

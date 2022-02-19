@@ -30,6 +30,7 @@ impl Cpu {
         }
     }
 
+    // TODO: better jr
     pub fn run_cycle(&mut self, mmu: &mut Mmu) -> u8 {
         // In this implementation, the Cpu will give the number of cycle
         // to run on other components
@@ -39,54 +40,54 @@ impl Cpu {
             0x00 => 4, // NOP
             0x01 => { let w = self.readw(mmu); self.reg.set_bc(w); 12 }, // LD BC, n16
             0x02 => { mmu.writeb(self.reg.bc(), self.reg.a); 8 }, // LD (BC), A
-            0x03 => { let bc = self.reg.bc(); self.reg.set_bc(bc + 1); 8 }, // INC BC
+            0x03 => { let bc = self.reg.bc(); self.reg.set_bc(bc.wrapping_add(1)); 8 }, // INC BC
             0x04 => { self.reg.b = self.inc(self.reg.b); 4 }, // INC B
             0x05 => { self.reg.b = self.dec(self.reg.b); 4 }, // DEC B
             0x06 => { self.reg.b = self.readb(mmu); 8 }, // LD B, u8
             0x08 => { let addr = self.readw(mmu); mmu.writew(addr, self.reg.sp); 20 }, // LD (u16), SP
             0x0a => { let bc = self.reg.bc(); self.reg.a = mmu.readb(bc); 8 }, // LD A, (BC)
-            0x0b => { let bc = self.reg.bc(); self.reg.set_bc(bc - 1); 8 }, // DEC BC
+            0x0b => { let bc = self.reg.bc(); self.reg.set_bc(bc.wrapping_sub(1)); 8 }, // DEC BC
             0x0c => { self.reg.c = self.inc(self.reg.c); 4 }, // INC C
             0x0d => { self.reg.c = self.dec(self.reg.c); 4 }, // DEC C
             0x0e => { self.reg.c = self.readb(mmu); 8 }, // LD C, u8
             0x10 => 4, // STOP
             0x11 => { let w = self.readw(mmu); self.reg.set_de(w); 12 }, // LD DE, n16
             0x12 => { mmu.writeb(self.reg.de(), self.reg.a); 8 }, // LD (DE), A
-            0x13 => { let de = self.reg.de(); self.reg.set_de(de + 1); 8 }, // INC DE
+            0x13 => { let de = self.reg.de(); self.reg.set_de(de.wrapping_add(1)); 8 }, // INC DE
             0x14 => { self.reg.d = self.inc(self.reg.d); 4 }, // INC D
             0x15 => { self.reg.d = self.dec(self.reg.d); 4 }, // DEC D
             0x16 => { self.reg.d = self.readb(mmu); 8 }, // LD D, u8
-            0x18 => { self.jr(mmu); 12 }, // JR i8
+            0x18 => { let delta = self.readb(mmu); self.jr(delta as i8); 12 }, // JR i8
             0x1a => { let de = self.reg.de(); self.reg.a = mmu.readb(de); 8 }, // LD A, (DE)
-            0x1b => { let de = self.reg.de(); self.reg.set_de(de - 1); 8 }, // DEC DE
+            0x1b => { let de = self.reg.de(); self.reg.set_de(de.wrapping_sub(1)); 8 }, // DEC DE
             0x1c => { self.reg.e = self.inc(self.reg.e); 4 }, // INC E
             0x1d => { self.reg.e = self.dec(self.reg.e); 4 }, // DEC E
             0x1e => { self.reg.e = self.readb(mmu); 8 }, // LD E, u8
-            0x20 => { if self.reg.get_z() { 8 } else { self.jr(mmu); 12 } } // JR NZ, i8
+            0x20 => { let delta = self.readb(mmu); if self.reg.get_z() { 8 } else { self.jr(delta as i8); 12 } } // JR NZ, i8
             0x21 => { let w = self.readw(mmu); self.reg.set_hl(w); 12 }, // LD HL, n16
             0x22 => { mmu.writeb(self.reg.hl(), self.reg.a); self.inc_hl(); 8 }, // LD (HL+), A
             0x23 => { self.inc_hl(); 8 }, // INC HL
             0x24 => { self.reg.h = self.inc(self.reg.h); 4 }, // INC H
             0x25 => { self.reg.h = self.dec(self.reg.h); 4 }, // DEC H
             0x26 => { self.reg.h = self.readb(mmu); 8 }, // LD H, u8
-            0x28 => { if self.reg.get_z() { self.jr(mmu); 12 } else { 8 } } // JR Z, i8
+            0x28 => { let delta = self.readb(mmu); if self.reg.get_z() { self.jr(delta as i8); 12 } else { 8 } } // JR Z, i8
             0x2a => { let hl = self.reg.hl(); self.inc_hl(); self.reg.a = mmu.readb(hl); 8 }, // LD A, (HL+)
             0x2b => { self.dec_hl(); 8 }, // DEC HL
             0x2c => { self.reg.l = self.inc(self.reg.l); 4 }, // INC L
             0x2d => { self.reg.l = self.dec(self.reg.l); 4 }, // DEC L
             0x2e => { self.reg.l = self.readb(mmu); 8 }, // LD L, u8
             0x2f => { self.cpl(); 4 }, // CPL
-            0x30 => { if self.reg.get_c() { 8 } else { self.jr(mmu); 12 } } // JR NC, i8
+            0x30 => { let delta = self.readb(mmu); if self.reg.get_c() { 8 } else { self.jr(delta as i8); 12 } } // JR NC, i8
             0x31 => { self.reg.sp = self.readw(mmu); 12 }, // LD SP, n16
             0x32 => { mmu.writeb(self.reg.hl(), self.reg.a); self.dec_hl(); 8 }, // LD (HL-), A
-            0x33 => { self.reg.sp += 1; 8 }, // INC SP
+            0x33 => { self.reg.sp = self.reg.sp.wrapping_add(1); 8 }, // INC SP
             0x34 => { let hl = self.reg.hl(); self.inc_at(mmu, hl); 12 }, // INC (HL)
             0x35 => { let hl = self.reg.hl(); self.dec_at(mmu, hl); 12 }, // DEC (HL)
             0x36 => { mmu.writeb(self.reg.hl(), self.reg.a); 8 }, // LD (HL), u8
             0x37 => { self.scf(); 4 }, // SCF
-            0x38 => { if self.reg.get_c() { self.jr(mmu); 12 } else { 8 } }, // JR C, i8
+            0x38 => { let delta = self.readb(mmu); if self.reg.get_c() { self.jr(delta as i8); 12 } else { 8 } }, // JR C, i8
             0x3a => { let hl = self.reg.hl(); self.dec_hl(); self.reg.a = mmu.readb(hl); 8 }, // LD A, (HL-)
-            0x3b => { self.reg.sp -= 1; 8 }, // DEC SP
+            0x3b => { self.reg.sp = self.reg.sp.wrapping_sub(1); 8 }, // DEC SP
             0x3c => { self.reg.a = self.inc(self.reg.a); 4 }, // INC A
             0x3d => { self.reg.a = self.dec(self.reg.a); 4 }, // DEC A
 
@@ -227,17 +228,17 @@ impl Cpu {
             0xd6 | 0xde => { let val = self.readb(mmu); self.sub(val, opcode == 0xde); 8 }, // SUB A, u8 or SBC A, u8
             0xda => { if self.reg.get_c() { self.reg.pc = self.readw(mmu); 16 } else { 12 } }, // JP C, u16
 
-            0xe0 => { let addr = 0xff00 + self.readb(mmu) as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+u8), A
+            0xe0 => { let addr = 0xff00 | self.readb(mmu) as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+u8), A
             0xe1 => { let hl = self.pop(mmu); self.reg.set_hl(hl); 12 }, // POP HL
-            0xe2 => { let addr = 0xff00 + self.reg.c as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+C), A
+            0xe2 => { let addr = 0xff00 | self.reg.c as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+C), A
             0xe5 => { self.push(mmu, self.reg.hl()); 16 }, // PUSH HL
             0xe6 => { let val = self.readb(mmu); self.and(val); 8 }, // AND A, u8
             0xea => { let addr = self.readw(mmu); mmu.writeb(addr, self.reg.a); 16 }, // LD (u16), A
             0xee => { let val = self.readb(mmu); self.xor(val); 8 }, // XOR A, u8
 
-            0xf0 => { let addr = 0xff00 + self.readb(mmu) as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+u8)
+            0xf0 => { let addr = 0xff00 | self.readb(mmu) as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+u8)
             0xf1 => { let af = self.pop(mmu); self.reg.set_af(af); 12 }, // POP AF
-            0xf2 => { let addr = 0xff00 + self.reg.c as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+C)
+            0xf2 => { let addr = 0xff00 | self.reg.c as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+C)
             0xf3 => { self.ime = false; 4 }, // DI
             0xf5 => { self.push(mmu, self.reg.af()); 16 }, // PUSH AF
             0xf6 => { let val = self.readb(mmu); self.or(val); 8 }, // OR A, u8
@@ -324,10 +325,9 @@ impl Cpu {
         self.reg.set_c(true);
     }
 
-    fn jr(&mut self, mmu: &mut Mmu) {
+    fn jr(&mut self, delta: i8) {
         // Add i8 to PC
-        let delta = self.readb(mmu) as i8;
-        self.reg.pc = self.reg.pc.wrapping_add(delta as u16);
+        self.reg.pc = ((self.reg.pc as u32 as i32) + (delta as i32)) as u16;
     }
 
     fn inc(&mut self, value: u8) -> u8 {

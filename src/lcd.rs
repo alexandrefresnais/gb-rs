@@ -116,15 +116,15 @@ impl Lcd {
         // Tiles form the background and are not interactive.
         // Size: 8x8
 
-        let scrollX = mmu.readb(SCROLL_X_REGISTER);
-        let scrollY = mmu.readb(SCROLL_Y_REGISTER);
-        let windowX = mmu.readb(WINDOW_X_REGISTER);
-        let windowY = mmu.readb(WINDOW_Y_REGISTER) - 7;
+        let scroll_x = mmu.readb(SCROLL_X_REGISTER);
+        let scroll_y = mmu.readb(SCROLL_Y_REGISTER);
+        let window_x = mmu.readb(WINDOW_X_REGISTER);
+        let window_y = mmu.readb(WINDOW_Y_REGISTER) - 7;
 
         let lcd_control = mmu.readb(LCD_CONTROL_REGISTER);
 
         // Check if window is set and current scanline has window
-        let draw_window: bool = lcd_control.is_set(5) && windowY <= self.curr_line;
+        let draw_window: bool = lcd_control.is_set(5) && window_y <= self.curr_line;
 
         let mut tile_data: u16 = 0x8000;
         let mut unsig_op = true;
@@ -142,8 +142,8 @@ impl Lcd {
 
         // Which of the 32 Y tiles we are drawing
         let y_tile: u8 = match draw_window {
-            true => self.curr_line - windowY,
-            false => scrollY + self.curr_line,
+            true => self.curr_line - window_y,
+            false => scroll_y + self.curr_line,
         };
 
         // Which of 8 pixel of tile are we drawinf
@@ -151,9 +151,9 @@ impl Lcd {
 
         // Draw the 160 horizontal pixels
         for pixel in 0..160 {
-            let mut x_pos = pixel + scrollX;
-            if draw_window && pixel >= windowX {
-                x_pos = pixel - windowX;
+            let mut x_pos = pixel + scroll_x;
+            if draw_window && pixel >= window_x {
+                x_pos = pixel - window_x;
             }
 
             // which of the 32 horizontal tiles
@@ -288,13 +288,13 @@ impl Lcd {
         let curr_mode = self.status & 0x3;
         let mut mode = 0;
         let mut status = self.status;
-        let mut reqInt = false;
+        let mut req_int = false;
 
-        if (self.curr_line >= 144) {
+        if self.curr_line >= 144 {
             mode = 1;
             status |= 1;
             status &= 0b11111101;
-            reqInt = status.is_set(4);
+            req_int = status.is_set(4);
         } else {
             let mode2bounds = 456 - 80;
             let mode3bounds = mode2bounds - 172;
@@ -304,7 +304,7 @@ impl Lcd {
                 mode = 2;
                 status |= 0b10;
                 status &= 0b11111110;
-                reqInt = status.is_set(5);
+                req_int = status.is_set(5);
             }
             // mode 3
             else if self.scanlines_cycles >= mode3bounds {
@@ -315,12 +315,12 @@ impl Lcd {
             else {
                 mode = 0;
                 status &= 0b11111100;
-                reqInt = status.is_set(3);
+                req_int = status.is_set(3);
             }
         }
 
         // Interupt requested and switch mode
-        if reqInt && (mode != curr_mode) {
+        if req_int && (mode != curr_mode) {
             mmu.request_interupt(LCD_INTERUPT);
         }
 

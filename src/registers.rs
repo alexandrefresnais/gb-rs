@@ -1,3 +1,5 @@
+use crate::utils::Bits;
+
 pub struct Registers {
     pub a: u8,
     pub b: u8,
@@ -70,49 +72,49 @@ impl Registers {
 
     pub fn set_z(&mut self, value: bool) {
         if value {
-            self.f |= 0b1000000;
+            self.f = self.f.set_bit(7);
         } else {
-            self.f &= 0b0111111;
+            self.f = self.f.unset_bit(7);
         }
     }
 
     pub fn set_n(&mut self, value: bool) {
         if value {
-            self.f |= 0b100000;
+            self.f = self.f.set_bit(6);
         } else {
-            self.f &= 0b011111;
+            self.f = self.f.unset_bit(6);
         }
     }
 
     pub fn set_h(&mut self, value: bool) {
         if value {
-            self.f |= 0b10000;
+            self.f = self.f.set_bit(5);
         } else {
-            self.f |= 0b01111;
+            self.f = self.f.unset_bit(5);
         }
     }
 
     pub fn set_c(&mut self, value: bool) {
         if value {
-            self.f |= 0b1000;
+            self.f = self.f.set_bit(4);
         } else {
-            self.f &= 0b0111;
+            self.f = self.f.unset_bit(4);
         }
     }
 
-    pub fn get_z(&mut self) -> bool {
-        (self.f & 0b1000000) == 0b1000000
+    pub fn get_z(&self) -> bool {
+        self.f.is_set(7)
     }
 
-    pub fn get_n(&mut self) -> bool {
-        (self.f & 0b100000) == 0b100000
+    pub fn get_n(&self) -> bool {
+        self.f.is_set(6)
     }
 
-    pub fn get_h(&mut self) -> bool {
-        (self.f & 0b10000) == 0b10000
+    pub fn get_h(&self) -> bool {
+        self.f.is_set(5)
     }
 
-    pub fn get_c(&mut self) -> bool {
-        (self.f & 0b1000) == 0b1000
+    pub fn get_c(&self) -> bool {
+        self.f.is_set(4)
     }
 }
