@@ -94,6 +94,7 @@ impl<'a> Mmu<'a> {
             } // ECHO RAM
             DIVIDER_REGISTER | TIMA | TMA | TMC => self.timer.writeb(addr, value),
             0xfea0..=0xfeff => (), // Restricted
+            0xff46 => self.do_dma(value),
             SCANLINE_REGISTER | STATUS_REGISTER => self.lcd.writeb(addr, value),
             INT_REQUEST_REGISTER => self.int_request = value,
             n => self.memory[n as usize] = value,
@@ -110,5 +111,13 @@ impl<'a> Mmu<'a> {
     pub fn request_interupt(&mut self, id: u8) {
         // Sets bit 'id'th in interupt request register
         self.int_request |= 1 << id;
+    }
+
+    fn do_dma(&mut self, value: u8) {
+        let base = (value as u16) << 8;
+        for i in 0..0xA0 {
+            let b = self.readb(base + i);
+            self.writeb(0xFE00 + i, b);
+        }
     }
 }
