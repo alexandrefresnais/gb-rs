@@ -119,11 +119,6 @@ impl<'a> Mmu<'a> {
         self.writeb(addr + 1, msb);
     }
 
-    pub fn request_interupt(&mut self, id: u8) {
-        // Sets bit 'id'th in interupt request register
-        self.int_request |= 1 << id;
-    }
-
     fn do_dma(&mut self, value: u8) {
         let base = (value as u16) << 8;
         for i in 0..0xA0 {
@@ -135,7 +130,9 @@ impl<'a> Mmu<'a> {
     pub fn update(&mut self, cycles: u32) {
         self.timer.update(cycles);
         self.int_request |= self.timer.int_request;
+        self.timer.int_request = 0;
         self.lcd.update_graphics(cycles);
         self.int_request |= self.lcd.int_request;
+        self.lcd.int_request = 0;
     }
 }
