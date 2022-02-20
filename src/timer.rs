@@ -87,13 +87,12 @@ impl Timer  {
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
-        if addr == DIVIDER_REGISTER {
-            // Forbidden so we reset divider
-            self.divider = 0;
-        }
-        else if addr == TMC {
-            // Frequency change
-            self.set_clock_freq(value);
+        match addr {
+            DIVIDER_REGISTER => self.divider = 0,// Forbidden so we reset divider
+            TMC => self.set_clock_freq(value),
+            TIMA => self.timer = value as u32,
+            TMA => self.timer_modulo = value,
+            _ => panic!("Forbidden address for timer {:#6X}.", addr),
         }
     }
 
