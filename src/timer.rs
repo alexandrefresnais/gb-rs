@@ -48,7 +48,7 @@ impl Timer  {
 
         self.divider_cycles += cycles;
         if self.divider_cycles > 255 {
-            self.divider += (self.divider_cycles / 256) as u8;
+            self.divider = self.divider.wrapping_add((self.divider_cycles / 256) as u8);
             self.divider_cycles %= 256;
         }
 
