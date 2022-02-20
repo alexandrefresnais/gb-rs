@@ -1,3 +1,14 @@
+pub fn to_u8(value: u16) -> (u8, u8) {
+    // Converts u16 into (msb: u8, lsb: u8)
+    let lsb = value & 0xff;
+    let msb = (value & 0xff00) >> 8;
+    (msb as u8, lsb as u8)
+}
+
+pub fn to_u16(msb: u8, lsb: u8) -> u16 {
+    ((msb as u16) << 8) | lsb as u16
+}
+
 pub trait Bits {
     // Returns true if bit at index is set
     fn is_set(&self, index: u8) -> bool;
@@ -118,6 +129,12 @@ mod tests {
     fn set_bit_u8_2() {
         let val: u16 = 0b0100_0010;
         assert_eq!(val.set_bit(1), 0b0100_0010);
+    }
+
+    #[test]
+    fn set_bit_u8_3() {
+        let val: u16 = 0x7F;
+        assert_eq!(val.set_bit(7), 0xFF);
     }
 
     #[test]

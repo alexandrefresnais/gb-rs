@@ -11,8 +11,8 @@ use crate::timer::DIVIDER_REGISTER;
 use crate::timer::TIMA;
 use crate::timer::TMA;
 use crate::timer::TMC;
-use crate::to_u16;
-use crate::to_u8;
+use crate::utils::to_u16;
+use crate::utils::to_u8;
 
 const INT_REQUEST_REGISTER: u16 = 0xFF0F; // Interupt Request Register
 const INT_ENABLED_REGISTER: u16 = 0xFFFF; // Interupt Enabled Register

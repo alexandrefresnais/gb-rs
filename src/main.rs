@@ -1,16 +1,5 @@
 use std::env;
 
-fn to_u8(value: u16) -> (u8, u8) {
-    // Converts u16 into (msb: u8, lsb: u8)
-    let lsb = value & 0xff;
-    let msb = (value & 0xff00) >> 8;
-    (msb as u8, lsb as u8)
-}
-
-fn to_u16(msb: u8, lsb: u8) -> u16 {
-    ((msb as u16) << 8) | lsb as u16
-}
-
 mod cpu;
 mod mmu;
 mod registers;
@@ -22,6 +11,15 @@ mod utils;
 use cpu::Cpu;
 use mmu::Mmu;
 use cartridge::Cartridge;
+
+fn read_blargg(mmu: &mut Mmu) {
+    let has_out = mmu.readb(0xff02);
+    if has_out == 0x81 {
+        let chr = mmu.readb(0xff01) as char;
+        print!("{}", chr);
+        mmu.writeb(0xff02, 0);
+    }
+}
 
 fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
     // GameBoy can execute 4194304 cycles per second
@@ -36,6 +34,8 @@ fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
         mmu.update(cpu_cycles);
         cpu.check_interupts(mmu);
         cycles += cpu_cycles;
+
+        // read_blargg(mmu);
     }
 
     // Render the screen
