@@ -98,7 +98,7 @@ impl Cpu {
             0x33 => { self.reg.sp = self.reg.sp.wrapping_add(1); 8 }, // INC SP
             0x34 => { let hl = self.reg.hl(); self.inc_at(mmu, hl); 12 }, // INC (HL)
             0x35 => { let hl = self.reg.hl(); self.dec_at(mmu, hl); 12 }, // DEC (HL)
-            0x36 => { let val = self.readb(mmu); mmu.writeb(self.reg.hl(), val); 8 }, // LD (HL), u8
+            0x36 => { let val = self.readb(mmu); mmu.writeb(self.reg.hl(), val); 12 }, // LD (HL), u8
             0x37 => { self.scf(); 4 }, // SCF
             0x38 => { let delta = self.readb(mmu); if self.reg.get_c() { self.jr(delta as i8); 12 } else { 8 } }, // JR C, i8
             0x39 => { self.add16(self.reg.sp); 8 }, // ADD HL, SP
@@ -172,7 +172,7 @@ impl Cpu {
             0x7c => { self.reg.a = self.reg.h; 4 }, // LD A, H
             0x7d => { self.reg.a = self.reg.l; 4 }, // LD A, L
             0x7e => { self.reg.a = mmu.readb(self.reg.hl()); 8 }, // LD A, (HL)
-            0x7f => { 8 }, // LD A, A
+            0x7f => { 4 }, // LD A, A
 
             0x80 | 0x88 => { self.add(self.reg.b, opcode == 0x88); 4 }, // ADD A, B or ADC A, B
             0x81 | 0x89 => { self.add(self.reg.c, opcode == 0x89); 4 }, // ADD A, C or ADC A, C
@@ -260,7 +260,7 @@ impl Cpu {
 
             0xe0 => { let addr = 0xff00 | self.readb(mmu) as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+u8), A
             0xe1 => { let hl = self.pop(mmu); self.reg.set_hl(hl); 12 }, // POP HL
-            0xe2 => { let addr = 0xff00 | self.reg.c as u16; mmu.writeb(addr, self.reg.a); 12 }, // LD (FF00+C), A
+            0xe2 => { let addr = 0xff00 | self.reg.c as u16; mmu.writeb(addr, self.reg.a); 8 }, // LD (FF00+C), A
             0xe5 => { self.push(mmu, self.reg.hl()); 16 }, // PUSH HL
             0xe6 => { let val = self.readb(mmu); self.and(val); 8 }, // AND A, u8
             0xe7 => { self.call(mmu, 0x20); 16 }, // RST 20
@@ -272,7 +272,7 @@ impl Cpu {
 
             0xf0 => { let addr = 0xff00 | self.readb(mmu) as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+u8)
             0xf1 => { let af = self.pop(mmu); self.reg.set_af(af); 12 }, // POP AF
-            0xf2 => { let addr = 0xff00 | self.reg.c as u16; self.reg.a = mmu.readb(addr); 12 }, // LD A, (FF00+C)
+            0xf2 => { let addr = 0xff00 | self.reg.c as u16; self.reg.a = mmu.readb(addr); 8 }, // LD A, (FF00+C)
             0xf3 => { self.ime = false; 4 }, // DI
             0xf5 => { self.push(mmu, self.reg.af()); 16 }, // PUSH AF
             0xf6 => { let val = self.readb(mmu); self.or(val); 8 }, // OR A, u8
