@@ -20,7 +20,7 @@ const CLOCK_SPEED: u32 = 4194304;
 
 pub struct Timer {
     timer_controller: u8, // TMC
-    timer: u32, // TIMA
+    timer: u8, // TIMA
     timer_modulo: u8, // TMA
     timer_cycles: u32, // elasped cycles since last timer inc
     timer_frequency: u32, // Cycles quantity to increment timer
@@ -29,7 +29,7 @@ pub struct Timer {
     pub int_request: u8,
 }
 
-impl Timer  {
+impl Timer {
     pub fn new() -> Self {
         Timer {
             timer_controller: 0,
@@ -57,11 +57,11 @@ impl Timer  {
         }
 
         self.timer_cycles += cycles;
-        if self.timer_cycles >= self.timer_frequency {
+        while self.timer_cycles >= self.timer_frequency {
             // Enough cycle have run to increase timer
             if self.timer == 255 {
                 // About to overflow, set it to TMA
-                self.timer = self.timer_modulo as u32;
+                self.timer = self.timer_modulo;
 
                 self.int_request |= 1 << TIMER_INTERUPT;
             }
@@ -79,10 +79,10 @@ impl Timer  {
     pub fn readb(&self, addr: u16) -> u8 {
         match addr {
             DIVIDER_REGISTER => self.divider,
-            TIMA => self.timer as u8,
+            TIMA => self.timer,
             TMA => self.timer_modulo,
             TMC => self.timer_controller,
-            _ => panic!("Should not happen!")
+            _ => panic!("Forbidden address for timer {:#6X}.", addr)
         }
     }
 
@@ -90,10 +90,10 @@ impl Timer  {
         match addr {
             DIVIDER_REGISTER => self.divider = 0,// Forbidden so we reset divider
             TMC => self.set_clock_freq(value),
-            TIMA => self.timer = value as u32,
+            TIMA => self.timer = value,
             TMA => self.timer_modulo = value,
             _ => panic!("Forbidden address for timer {:#6X}.", addr),
-        }
+        };
     }
 
     fn set_clock_freq(&mut self, value: u8) {
