@@ -12,6 +12,7 @@ pub fn to_u16(msb: u8, lsb: u8) -> u16 {
 pub trait Bits {
     // Returns true if bit at index is set
     fn is_set(&self, index: u8) -> bool;
+    fn is_unset(&self, index: u8) -> bool;
     // Returns 1 if bit at index is set
     fn get_bit(&self, index: u8) -> u8;
     fn set_bit(&self, index: u8) -> Self;
@@ -20,7 +21,10 @@ pub trait Bits {
 
 impl Bits for u8 {
     fn is_set(&self, index: u8) -> bool {
-        return self & (1 << index) != 0;
+        self & (1 << index) != 0
+    }
+    fn is_unset(&self, index: u8) -> bool {
+        !self.is_set(index)
     }
     fn get_bit(&self, index: u8) -> u8 {
         self.is_set(index) as u8
@@ -35,7 +39,10 @@ impl Bits for u8 {
 
 impl Bits for u16 {
     fn is_set(&self, index: u8) -> bool {
-        return self & (1 << index) != 0;
+        self & (1 << index) != 0
+    }
+    fn is_unset(&self, index: u8) -> bool {
+        !self.is_set(index)
     }
     fn get_bit(&self, index: u8) -> u8 {
         self.is_set(index) as u8

@@ -1,23 +1,25 @@
 use std::env;
 
 extern crate minifb;
-use minifb::{Window, WindowOptions, ScaleMode, Scale};
+use minifb::{Key, KeyRepeat, Scale, ScaleMode, Window, WindowOptions};
 
+mod cartridge;
 mod cpu;
+mod joypad;
+mod lcd;
 mod mmu;
 mod registers;
-mod lcd;
-mod cartridge;
 mod timer;
 mod utils;
 
+use cartridge::Cartridge;
 use cpu::Cpu;
 use mmu::Mmu;
-use cartridge::Cartridge;
+
+use joypad::*;
 
 use lcd::SCREEN_HEIGHT;
 use lcd::SCREEN_WIDTH;
-
 
 fn read_blargg(mmu: &mut Mmu) {
     let has_out = mmu.readb(0xff02);
@@ -52,29 +54,61 @@ fn main() {
     let mut mmu = Mmu::new(&mut cartridge);
     let mut cpu = Cpu::new();
 
-    let mut win_opt = WindowOptions::default();
-    win_opt.scale_mode = ScaleMode::AspectRatioStretch;
-    win_opt.resize = true;
-    win_opt.scale = Scale::X2;
-
     let mut buffer: Vec<u32> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT];
     let mut window = Window::new(
         "gb-rs",
         SCREEN_WIDTH,
         SCREEN_HEIGHT,
-        win_opt,
-    ).unwrap();
+        WindowOptions {
+            resize: true,
+            scale_mode: ScaleMode::AspectRatioStretch,
+            scale: Scale::X2,
+            ..WindowOptions::default()
+        },
+    )
+    .unwrap();
 
-      while window.is_open() {
+    // Make sure that at least 4 ms has passed since the last event poll
+    window.limit_update_rate(Some(std::time::Duration::from_millis(16)));
+
+    while window.is_open() {
         run_one_frame(&mut cpu, &mut mmu);
         for x in 0..SCREEN_WIDTH {
             for y in 0..SCREEN_HEIGHT {
                 let (r, g, b) = mmu.lcd.screen_data[x][y].rgb();
-                buffer[y * SCREEN_WIDTH + x] = 0xFF000000 | (r as u32) << 16 | (g as u32)  << 8 | (b as u32);
+                buffer[y * SCREEN_WIDTH + x] =
+                    0xFF000000 | (r as u32) << 16 | (g as u32) << 8 | (b as u32);
             }
         }
         window
             .update_with_buffer(&buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
             .unwrap();
+
+        window
+            .get_keys_pressed(KeyRepeat::No)
+            .iter()
+            .for_each(|key| match key {
+                Key::Left => mmu.joypad.on_key_pressed(JoypadInput::LEFT),
+                Key::Right => mmu.joypad.on_key_pressed(JoypadInput::RIGHT),
+                Key::Up => mmu.joypad.on_key_pressed(JoypadInput::UP),
+                Key::Down => mmu.joypad.on_key_pressed(JoypadInput::DOWN),
+                Key::A => mmu.joypad.on_key_pressed(JoypadInput::A),
+                Key::S => mmu.joypad.on_key_pressed(JoypadInput::B),
+                Key::Enter => mmu.joypad.on_key_pressed(JoypadInput::START),
+                Key::Space => mmu.joypad.on_key_pressed(JoypadInput::SELECT),
+                _ => (),
+            });
+
+        window.get_keys_released().iter().for_each(|key| match key {
+            Key::Left => mmu.joypad.on_key_released(JoypadInput::LEFT),
+            Key::Right => mmu.joypad.on_key_released(JoypadInput::RIGHT),
+            Key::Up => mmu.joypad.on_key_released(JoypadInput::UP),
+            Key::Down => mmu.joypad.on_key_released(JoypadInput::DOWN),
+            Key::A => mmu.joypad.on_key_released(JoypadInput::A),
+            Key::S => mmu.joypad.on_key_released(JoypadInput::B),
+            Key::Enter => mmu.joypad.on_key_released(JoypadInput::START),
+            Key::Space => mmu.joypad.on_key_released(JoypadInput::SELECT),
+            _ => (),
+        });
     }
 }

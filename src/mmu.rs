@@ -1,4 +1,6 @@
 use crate::cartridge::Cartridge;
+use crate::joypad::Joypad;
+use crate::joypad::JOYPAD_REGISTER;
 use crate::lcd::Lcd;
 use crate::lcd::CONTROL_REGISTER;
 use crate::lcd::WINDOW_X_REGISTER;
@@ -21,6 +23,7 @@ const INT_ENABLED_REGISTER: u16 = 0xFFFF; // Interupt Enabled Register
 pub struct Mmu<'a> {
     cartridge: &'a mut Cartridge,
     pub memory: [u8; 0x10000],
+    pub joypad: Joypad,
     pub lcd: Lcd,
     pub timer: Timer,
     pub int_request: u8, // Interupt Request Register
@@ -32,6 +35,7 @@ impl<'a> Mmu<'a> {
         let mut mmu = Mmu {
             cartridge,
             memory: [0; 0x10000],
+            joypad: Joypad::new(),
             lcd: Lcd::new(),
             timer: Timer::new(),
             int_request: 0,
@@ -80,6 +84,7 @@ impl<'a> Mmu<'a> {
             VRAM_START..=VRAM_END => self.lcd.readb(addr),
             OAM_START..=OAM_END => self.lcd.readb(addr),
             CONTROL_REGISTER..=WINDOW_X_REGISTER => self.lcd.readb(addr),
+            JOYPAD_REGISTER => self.joypad.readb(addr),
             INT_REQUEST_REGISTER => self.int_request,
             INT_ENABLED_REGISTER => self.int_enabled,
             _ => self.memory[addr as usize],
@@ -106,6 +111,7 @@ impl<'a> Mmu<'a> {
             VRAM_START..=VRAM_END => self.lcd.writeb(addr, value),
             OAM_START..=OAM_END => self.lcd.writeb(addr, value),
             CONTROL_REGISTER..=WINDOW_X_REGISTER => self.lcd.writeb(addr, value),
+            JOYPAD_REGISTER => self.joypad.writeb(addr, value),
             INT_REQUEST_REGISTER => self.int_request = value,
             INT_ENABLED_REGISTER => self.int_enabled = value,
             n => self.memory[n as usize] = value,
@@ -134,5 +140,7 @@ impl<'a> Mmu<'a> {
         self.lcd.update_graphics(cycles);
         self.int_request |= self.lcd.int_request;
         self.lcd.int_request = 0;
+        self.int_request |= self.joypad.int_request;
+        self.joypad.int_request = 0;
     }
 }
