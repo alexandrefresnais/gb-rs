@@ -6,13 +6,13 @@ use crate::utils::Bits;
 
 // Address of interupts routines
 const V_BLANK_ROUTINE: u16 = 0x40;
-const LCD_ROUTINE: u16 = 0x48;
+const STAT_ROUTINE: u16 = 0x48;
 const TIMER_ROUTINE: u16 = 0x50;
 const JOYPAD_ROUTINE: u16 = 0x60;
 
 // Interupt bit
 pub const V_BLANK_INTERUPT: u8 = 0;
-pub const LCD_INTERUPT: u8 = 1;
+pub const STAT_INTERUPT: u8 = 1;
 pub const TIMER_INTERUPT: u8 = 2;
 pub const JOYPAD_INTERUPT: u8 = 4;
 
@@ -754,7 +754,7 @@ impl Cpu {
 
         match interupt {
             V_BLANK_INTERUPT => self.call(mmu, V_BLANK_ROUTINE),
-            LCD_INTERUPT => self.call(mmu, LCD_ROUTINE),
+            STAT_INTERUPT => self.call(mmu, STAT_ROUTINE),
             TIMER_INTERUPT => self.call(mmu, TIMER_ROUTINE),
             JOYPAD_INTERUPT => self.call(mmu, JOYPAD_ROUTINE),
             _ => panic!("Should not happen")

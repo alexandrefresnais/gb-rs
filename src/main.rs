@@ -1,5 +1,8 @@
 use std::env;
 
+extern crate minifb;
+use minifb::{Window, WindowOptions, ScaleMode, Scale};
+
 mod cpu;
 mod mmu;
 mod registers;
@@ -11,6 +14,10 @@ mod utils;
 use cpu::Cpu;
 use mmu::Mmu;
 use cartridge::Cartridge;
+
+use lcd::SCREEN_HEIGHT;
+use lcd::SCREEN_WIDTH;
+
 
 fn read_blargg(mmu: &mut Mmu) {
     let has_out = mmu.readb(0xff02);
@@ -37,8 +44,6 @@ fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
 
         // read_blargg(mmu);
     }
-
-    // Render the screen
 }
 
 fn main() {
@@ -47,7 +52,29 @@ fn main() {
     let mut mmu = Mmu::new(&mut cartridge);
     let mut cpu = Cpu::new();
 
-    loop {
+    let mut win_opt = WindowOptions::default();
+    win_opt.scale_mode = ScaleMode::AspectRatioStretch;
+    win_opt.resize = true;
+    win_opt.scale = Scale::X2;
+
+    let mut buffer: Vec<u32> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT];
+    let mut window = Window::new(
+        "gb-rs",
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
+        win_opt,
+    ).unwrap();
+
+      while window.is_open() {
         run_one_frame(&mut cpu, &mut mmu);
+        for x in 0..SCREEN_WIDTH {
+            for y in 0..SCREEN_HEIGHT {
+                let (r, g, b) = mmu.lcd.screen_data[x][y].rgb();
+                buffer[y * SCREEN_WIDTH + x] = 0xFF000000 | (r as u32) << 16 | (g as u32)  << 8 | (b as u32);
+            }
+        }
+        window
+            .update_with_buffer(&buffer, SCREEN_WIDTH, SCREEN_HEIGHT)
+            .unwrap();
     }
 }
