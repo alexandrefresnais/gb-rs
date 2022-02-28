@@ -9,14 +9,14 @@ const BUTTON_BIT: u8 = 5;
 
 #[derive(Clone, Copy)]
 pub enum JoypadInput {
-    RIGHT = 0,
-    LEFT = 1,
-    UP = 2,
-    DOWN = 3,
+    Right = 0,
+    Left = 1,
+    Up = 2,
+    Down = 3,
     A = 4,
     B = 5,
-    SELECT = 6,
-    START = 7,
+    Select = 6,
+    Start = 7,
 }
 
 impl JoypadInput {
@@ -48,10 +48,9 @@ impl Joypad {
     pub fn on_key_pressed(&mut self, input: JoypadInput) {
         // Key was already pressed, nothing to do
         if self.input_pressed[input as usize] {
-            return
+            return;
         }
 
-        // remember if a keypressed its bit is 0 not 1
         self.input_pressed[input as usize] = true;
 
         if (input.is_button() && self.button_selected)

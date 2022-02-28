@@ -206,10 +206,8 @@ impl Lcd {
                     if self.lcd_status.mode != 3 {
                         self.set_mode(3);
                     }
-                } else {
-                    if self.lcd_status.mode != 0 {
-                        self.set_mode(0);
-                    }
+                } else if self.lcd_status.mode != 0 {
+                    self.set_mode(0);
                 }
             }
         }
@@ -227,10 +225,8 @@ impl Lcd {
             if self.lcd_status.mode1_int_enable {
                 self.int_request |= 1 << STAT_INTERUPT;
             }
-        } else if mode == 2 {
-            if self.lcd_status.mode2_int_enable {
-                self.int_request |= 1 << STAT_INTERUPT
-            }
+        } else if mode == 2 && self.lcd_status.mode2_int_enable {
+            self.int_request |= 1 << STAT_INTERUPT
         }
     }
 
@@ -335,7 +331,7 @@ impl Lcd {
 
             let base_memory = match draw_window {
                 true => self.lcd_control.window_tilemap,
-                false => self.lcd_control.bg_tilemap
+                false => self.lcd_control.bg_tilemap,
             };
 
             let (tile_row, tile_col) = match draw_window {
@@ -352,7 +348,9 @@ impl Lcd {
 
             let tile_location: u16 = match self.lcd_control.bg_win_tile_data {
                 0x8000 => self.lcd_control.bg_win_tile_data + (tile_num as u16) * 16,
-                _ => self.lcd_control.bg_win_tile_data + ((tile_num as i8 as i16 + 128) as u16) * 16
+                _ => {
+                    self.lcd_control.bg_win_tile_data + ((tile_num as i8 as i16 + 128) as u16) * 16
+                }
             };
 
             // Each 8 pixels line is encode on 2 bytes
@@ -378,7 +376,7 @@ impl Lcd {
             // sprite are 4 bytes wide
             let index = ((39 - sprite) as u16) * 4;
 
-            let y_pos = self.readb(0xFE00 + index + 0) as u16 as i32 - 16;
+            let y_pos = self.readb(0xFE00 + index) as u16 as i32 - 16;
             let y_size = self.lcd_control.obj_size as i32;
 
             let line = self.lcd_status.curr_line as i32;
@@ -389,7 +387,7 @@ impl Lcd {
             let x_pos = self.readb(0xFE00 + index + 1) as u16 as i32 - 8;
             let tile_location = match self.lcd_control.obj_size {
                 16 => self.readb(0xFE00 + index + 2) & 0xFE,
-                8 => self.readb(0xFE00 + index + 2) & 0xFF,
+                8 => self.readb(0xFE00 + index + 2),
                 _ => panic!("Unexpected OBJ size."),
             } as u16;
 
@@ -440,8 +438,8 @@ impl Lcd {
                     continue;
                 }
                 let palette = match attributes.is_set(4) {
-                    true =>self.obj1_palette,
-                    false => self.obj0_palette
+                    true => self.obj1_palette,
+                    false => self.obj0_palette,
                 };
 
                 let color = self.get_color(color_id, palette);

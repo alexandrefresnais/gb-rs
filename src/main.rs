@@ -21,15 +21,6 @@ use joypad::*;
 use lcd::SCREEN_HEIGHT;
 use lcd::SCREEN_WIDTH;
 
-fn read_blargg(mmu: &mut Mmu) {
-    let has_out = mmu.readb(0xff02);
-    if has_out == 0x81 {
-        let chr = mmu.readb(0xff01) as char;
-        print!("{}", chr);
-        mmu.writeb(0xff02, 0);
-    }
-}
-
 fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
     // GameBoy can execute 4194304 cycles per second
     // We want 60 frames per second
@@ -43,8 +34,6 @@ fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
         mmu.update(cpu_cycles);
         cpu.check_interupts(mmu);
         cycles += cpu_cycles;
-
-        // read_blargg(mmu);
     }
 }
 
@@ -88,26 +77,26 @@ fn main() {
             .get_keys_pressed(KeyRepeat::No)
             .iter()
             .for_each(|key| match key {
-                Key::Left => mmu.joypad.on_key_pressed(JoypadInput::LEFT),
-                Key::Right => mmu.joypad.on_key_pressed(JoypadInput::RIGHT),
-                Key::Up => mmu.joypad.on_key_pressed(JoypadInput::UP),
-                Key::Down => mmu.joypad.on_key_pressed(JoypadInput::DOWN),
+                Key::Left => mmu.joypad.on_key_pressed(JoypadInput::Left),
+                Key::Right => mmu.joypad.on_key_pressed(JoypadInput::Right),
+                Key::Up => mmu.joypad.on_key_pressed(JoypadInput::Up),
+                Key::Down => mmu.joypad.on_key_pressed(JoypadInput::Down),
                 Key::A => mmu.joypad.on_key_pressed(JoypadInput::A),
                 Key::S => mmu.joypad.on_key_pressed(JoypadInput::B),
-                Key::Enter => mmu.joypad.on_key_pressed(JoypadInput::START),
-                Key::Space => mmu.joypad.on_key_pressed(JoypadInput::SELECT),
+                Key::Enter => mmu.joypad.on_key_pressed(JoypadInput::Start),
+                Key::Space => mmu.joypad.on_key_pressed(JoypadInput::Select),
                 _ => (),
             });
 
         window.get_keys_released().iter().for_each(|key| match key {
-            Key::Left => mmu.joypad.on_key_released(JoypadInput::LEFT),
-            Key::Right => mmu.joypad.on_key_released(JoypadInput::RIGHT),
-            Key::Up => mmu.joypad.on_key_released(JoypadInput::UP),
-            Key::Down => mmu.joypad.on_key_released(JoypadInput::DOWN),
+            Key::Left => mmu.joypad.on_key_released(JoypadInput::Left),
+            Key::Right => mmu.joypad.on_key_released(JoypadInput::Right),
+            Key::Up => mmu.joypad.on_key_released(JoypadInput::Up),
+            Key::Down => mmu.joypad.on_key_released(JoypadInput::Down),
             Key::A => mmu.joypad.on_key_released(JoypadInput::A),
             Key::S => mmu.joypad.on_key_released(JoypadInput::B),
-            Key::Enter => mmu.joypad.on_key_released(JoypadInput::START),
-            Key::Space => mmu.joypad.on_key_released(JoypadInput::SELECT),
+            Key::Enter => mmu.joypad.on_key_released(JoypadInput::Start),
+            Key::Space => mmu.joypad.on_key_released(JoypadInput::Select),
             _ => (),
         });
     }

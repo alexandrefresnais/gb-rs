@@ -355,7 +355,6 @@ impl Cpu {
             0x3d => { self.reg.l = self.srl(self.reg.l); 8 }, // SRL L
             0x3e => { let res = self.srl(mmu.readb(self.reg.hl())); mmu.writeb(self.reg.hl(), res); 16 }, // SRL (HL)
             0x3f => { self.reg.a = self.srl(self.reg.a); 8 }, // SRL A
-            0x40 => { self.bit(self.reg.b, 0); 8 }, // BIT 0, B
             0x40..=0x7f => {
                 let value = match opcode & 0x0f {
                     0x0 | 0x8 => self.reg.b,
@@ -558,7 +557,7 @@ impl Cpu {
 
     fn sla(&mut self, value: u8) -> u8 {
         // Shift left
-        let res = (value << 1);
+        let res = value << 1;
 
         self.reg.set_c(value.is_set(7));
         self.reg.set_h(false);
