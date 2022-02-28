@@ -1,35 +1,64 @@
 const MBC_REGISTER: u16 = 0x147;
 const ROM_BANK_SIZE: u16 = 0x4000;
 const RAM_BANK_SIZE: u16 = 0x2000;
-const NB_RAM_BANK: u16 = 4;
-const RAM_SIZE: usize = (NB_RAM_BANK * RAM_BANK_SIZE) as usize;
+
+trait Mbc {
+    fn readb(&self, addr: u16) -> u8;
+    fn writeb(&mut self, addr: u16, value: u8);
+}
+
+struct NoMbc {
+    rom: Vec<u8>,
+}
+
+impl NoMbc {
+    fn new(rom: Vec<u8>) -> Box<Self> {
+        Box::new(NoMbc { rom: rom })
+    }
+}
+
+impl Mbc for NoMbc {
+    fn readb(&self, addr: u16) -> u8 {
+        *self
+            .rom
+            .get(addr as usize)
+            .expect(&format!("Cannot access cartridge memory at {:#08x}", addr)[..])
+    }
+
+    fn writeb(&mut self, _addr: u16, _value: u8) {
+        // No write is supposed to happen.
+    }
+}
 
 pub struct Cartridge {
-    rom: Vec<u8>,
-    ram_banks: [u8; RAM_SIZE],
+    mbc: Box<dyn Mbc>,
 }
 
 impl Cartridge {
     pub fn new(filename: &str) -> Self {
+        let rom = std::fs::read(filename).expect("Cannot read rom");
+
+        let mbc_type = rom
+            .get(MBC_REGISTER as usize)
+            .expect("Could not read MBC register");
+
+        let mbc = match mbc_type {
+            0 => NoMbc::new(rom),
+            _ => panic!("Unsupported MBC"),
+        };
+
         let cartridge = Cartridge {
-            rom: std::fs::read(filename).expect("Cannot read rom"),
-            ram_banks: [0; RAM_SIZE],
+            mbc,
         };
 
         cartridge
     }
 
     pub fn readb(&self, addr: u16) -> u8 {
-        *self.rom.get(addr as usize).expect(&format!(
-            "Cannot access cartridge memory at {:#08x}",
-            addr
-        )[..])
+        self.mbc.readb(addr)
     }
 
     pub fn writeb(&mut self, addr: u16, value: u8) {
-        if (0xA000..0xC000).contains(&addr) {
-            // Cartridge RAM bank write
-            self.ram_banks[(addr - 0xA000) as usize] = value;
-        }
+        self.mbc.writeb(addr, value);
     }
 }
