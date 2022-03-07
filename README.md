@@ -8,6 +8,14 @@ Personal Gameboy emulator made in Rust.
 cargo run <path to ROM>
 ```
 
+## Controls
+
+* Enter: START
+* Space: SELECT
+* Arrow Keys: D-pad
+* A (or Q in AZERTY): A
+* S: B
+
 ## TODO
 
 - [ ] Audio
