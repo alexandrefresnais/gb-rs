@@ -62,7 +62,7 @@ impl Mbc1 {
     fn change_rom_ram_mode(&mut self, data: u8) {
         self.is_rom_banking = data & 0x1 == 0;
         if self.is_rom_banking {
-            // Gameboy can only use bank 0 in this mode
+            // Game Boy can only use bank 0 in this mode
             self.current_ram_bank = 0;
         }
     }

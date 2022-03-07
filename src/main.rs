@@ -25,7 +25,7 @@ use lcd::SCREEN_HEIGHT;
 use lcd::SCREEN_WIDTH;
 
 fn run_one_frame(cpu: &mut Cpu, mmu: &mut Mmu) {
-    // GameBoy can execute 4194304 cycles per second
+    // Game Boy can execute 4194304 cycles per second
     // We want 60 frames per second
     // So we run 69905 each frame
     const FRAME_CYLES: u32 = 69905;

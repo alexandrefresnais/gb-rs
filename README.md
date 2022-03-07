@@ -1,6 +1,6 @@
 # gb-rs
 
-Personal Gameboy emulator made in Rust.
+Personal Game Boy emulator made in Rust.
 
 ## Usage
 
@@ -26,7 +26,7 @@ cargo run <path to ROM>
 
 http://www.codeslinger.co.uk/pages/projects/gameboy/beginning.html
 
-Ultimate GameBoy Talk: https://www.youtube.com/watch?v=HyzD8pNlpwI
+Ultimate Game Boy Talk: https://www.youtube.com/watch?v=HyzD8pNlpwI
 
 ### CPU
 
