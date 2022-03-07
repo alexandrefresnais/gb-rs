@@ -2,6 +2,18 @@
 
 Personal Gameboy emulator made in Rust.
 
+## Usage
+
+```
+cargo run <path to ROM>
+```
+
+## TODO
+
+- [ ] Audio
+- [ ] More Memory Bank Controllers
+- [ ] Switch to better GUI library
+
 ## Bibliography
 
 http://www.codeslinger.co.uk/pages/projects/gameboy/beginning.html
@@ -21,3 +33,9 @@ https://b13rg.github.io/Gameboy-MBC-Analysis/
 https://b13rg.github.io/Gameboy-Bank-Switching/
 
 gbdev: https://gbdev.gg8.se/wiki/articles/Memory_Bank_Controllers#MBC3_.28max_2MByte_ROM_and.2For_64KByte_RAM_and_Timer.29
+
+### Test ROMs
+
+https://github.com/mattcurrie/dmg-acid2
+
+https://github.com/retrio/gb-test-roms
