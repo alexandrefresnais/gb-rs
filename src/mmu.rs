@@ -37,7 +37,7 @@ impl<'a> Mmu<'a> {
             memory: [0; 0x10000],
             joypad: Joypad::new(),
             lcd: Lcd::new(),
-            timer: Timer::new(),
+            timer: Timer::default(),
             int_request: 0,
             int_enabled: 0,
         };

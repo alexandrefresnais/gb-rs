@@ -13,8 +13,8 @@ pub struct Registers {
     pub sp: u16,
 }
 
-impl Registers {
-    pub fn new() -> Self {
+impl Default for Registers {
+    fn default() -> Self {
         let mut registers = Registers {
             a: 0,
             b: 0,
@@ -33,7 +33,9 @@ impl Registers {
         registers.set_hl(0x14d);
         registers
     }
+}
 
+impl Registers {
     pub fn af(&self) -> u16 {
         ((self.a as u16) << 8) | self.f as u16
     }

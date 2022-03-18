@@ -29,8 +29,8 @@ pub struct Timer {
     pub int_request: u8,
 }
 
-impl Timer {
-    pub fn new() -> Self {
+impl Default for Timer {
+    fn default() -> Self {
         Timer {
             timer_controller: 0,
             timer: 0,
@@ -42,7 +42,9 @@ impl Timer {
             int_request: 0
         }
     }
+}
 
+impl Timer {
     pub fn update(&mut self, cycles: u32) {
         // cycles: how many CPU cycles have run
 

@@ -23,15 +23,17 @@ pub struct Cpu {
     halted: bool,
 }
 
-impl Cpu {
-    pub fn new() -> Self {
+impl Default for Cpu {
+    fn default() -> Self {
         Cpu {
-            reg: Registers::new(),
+            reg: Registers::default(),
             ime: true,
             halted: false,
         }
     }
+}
 
+impl Cpu {
     // TODO: better jr
     pub fn run_cycle(&mut self, mmu: &mut Mmu) -> u32 {
         // In this implementation, the Cpu will give the number of cycle

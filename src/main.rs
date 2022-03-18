@@ -44,7 +44,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut cartridge = Cartridge::new(&args[1]);
     let mut mmu = Mmu::new(&mut cartridge);
-    let mut cpu = Cpu::new();
+    let mut cpu = Cpu::default();
 
     let mut buffer: Vec<u32> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT];
     let mut window = Window::new(
